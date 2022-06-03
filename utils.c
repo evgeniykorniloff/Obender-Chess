@@ -284,6 +284,3 @@ void PrintSearchStatus(int ply, int score, int time, U64 nodes, Move *pv){
 }
 
 
-/*
-  Сортирует массив исходя
-*/

@@ -164,20 +164,7 @@ void InitEvaluate(void){
     }
  }
 
- /*
- do{
-    void PrintArray(FILE*f,int tbl[64], int p, int c);
-    FILE *f = fopen("sctable.txt","w");
-    int p,c;
-
-    for(c = WHITE; c <= BLACK; c++)
-     for(p = PAWN; p <= KING; p++)
-       PrintArray(f, score_table[c][p], p, c);
-
-    fclose(f);
-
- }while(0);
- */
+ 
 }
 
 int maxHungValue[2];
@@ -186,58 +173,38 @@ int Evaluate(int alpha, int beta){
 
   int s[2];
 
-  maxHungValue[WHITE] = maxHungValue[BLACK] = 0;
+  maxHungValue[WHITE] =  maxHungValue [BLACK] = 0;
 
   s[WHITE] = g.mtl[WHITE];
   s[BLACK] = g.mtl[BLACK];
-/***
-  if( (g.cnt[WHITE][PAWN]  | g.cnt[BLACK][PAWN])==0  &&
-      (g.cnt[WHITE][QUEEN] | g.cnt[BLACK][QUEEN])==0 &&
-      (g.cnt[WHITE][ROOK ] | g.cnt[BLACK][ROOK])==0  &&
-       g.cnt[WHITE][BISHOP] * 4   +   g.cnt[WHITE][KNIGHT] * 3   <  4+3 &&
-       g.cnt[BLACK][BISHOP] * 4   +   g.cnt[BLACK][KNIGHT] * 3   <  4+3 )
-       return 0;
-****/
-    if( (g.cnt[WHITE][PAWN]  | g.cnt[BLACK][PAWN])==0 )
+
+  //Если нет пешек
+  if( (g.cnt[WHITE][PAWN]  | g.cnt[BLACK][PAWN])==0 )
   {
+    //Если нечем ставить мат
     if( (g.cnt[WHITE][QUEEN] | g.cnt[BLACK][QUEEN] | g.cnt[WHITE][ROOK ] | g.cnt[BLACK][ROOK])==0  &&
        g.cnt[WHITE][BISHOP] * 4   +   g.cnt[WHITE][KNIGHT] * 3   <  4+3 &&
        g.cnt[BLACK][BISHOP] * 4   +   g.cnt[BLACK][KNIGHT] * 3   <  4+3 )
-       //return 0;
        s[WHITE]=0,s[BLACK]=0;
+    //если есть чем ставить мат
     else{
        if(s[WHITE]==VALUE_K)
        {
+          //один белый король и у черных хватает материала для мата
           if(g.cnt[BLACK][ROOK] | g.cnt[BLACK][QUEEN] | (g.cnt[BLACK][BISHOP]>1))
              s[BLACK] += VALUE_Q*2;
-          else if(s[BLACK]==VALUE_K+VALUE_P){//король перед не фланговой пешкой
-              int u=g.kingSq[BLACK]-8;
-              if(u>0 && (u&7)!=0 && (u&7)!=7)
-               if(g.pos[u]==PAWN)
-                  s[BLACK] += VALUE_R;
-
-          }
        }else if(s[BLACK]==VALUE_K){
+          //один черный король и у белых хватает материала для мата
           if(g.cnt[WHITE][ROOK] | g.cnt[WHITE][QUEEN] | (g.cnt[WHITE][BISHOP]>1))
              s[WHITE] += VALUE_Q*2;
-          else if(s[WHITE]==VALUE_K+VALUE_P){//король перед не фланговой пешкой
-              int u=g.kingSq[WHITE]+8;
-              if(u<64 && (u&7)!=0 && (u&7)!=7)
-               if(g.pos[u]==PAWN)
-                  s[WHITE] += VALUE_R;
-          }
-       }
 
+       }
     }
   }
 
   if(s[g.side] - s[g.xside] + MARGIN <= alpha  ||
      s[g.side] - s[g.xside] - MARGIN >= beta)
      return s[g.side] - s[g.xside];
-
- // s[0] = s[1] = 0;
-//  s[0] /= 10;
-//  s[1] /= 10;
 
   do{
     void GenerateAttackes(void);
@@ -500,29 +467,6 @@ int Evaluate(int alpha, int beta){
                  if(g.cnt[c][BISHOP]>1) score += 8;
                  score += main_diag[sq];
 
-                 if(g.mtl[c^1]==VALUE_K){ //король противника в угол цвета слона
-                   static unsigned char black_sq[64]={
-                     0,1,0,1,0,1,0,1,
-                     1,0,1,0,1,0,1,0,
-                     0,1,0,1,0,1,0,1,
-                     1,0,1,0,1,0,1,0,
-                     0,1,0,1,0,1,0,1,
-                     1,0,1,0,1,0,1,0,
-                     0,1,0,1,0,1,0,1,
-                     1,0,1,0,1,0,1,0,
-                   };
-                   if(black_sq[sq]){
-                     score -= Taxi(56,g.kingSq[c1])<<1;
-                     //score -= Taxi(7,g.kingSq[c1]);
-                     score += 14;
-                   }else{
-                     //score -= Taxi(63,g.kingSq[c1]);
-                     score -= Taxi(0,g.kingSq[c1])<<1;
-                     score += 14;
-                   }
-
-                 }
-
                }else if(p==QUEEN){
                  int cnt;
                  score += QUEEN_BONUS;
@@ -669,15 +613,7 @@ void PrintArray(FILE*f,int tbl[64], int p, int c){
 
 void GenerateAttackes(void){
   int c0,i,sq,p,cntrl,j,*bit_atk,dP,n0,n1,u,d,p1;
-   
-    do{
-       const int *rtmp = (int*)p_attack + 128;
-       register unsigned long long *rt = (unsigned long long*)p_attack, 
-                                   *rs = (unsigned long long*)rtmp;
-
-      rt--; while(++rt < rs) *rt = (unsigned long long)0;
-    }while(0);
-   // memset(p_attack,0,sizeof(struct Atk_Type)*2);
+    memset(p_attack,0,sizeof(struct Atk_Type)*2);
     for(c0 = WHITE; c0 <= BLACK; c0++){
       //c1 = c0 ^ 1;
       dP = c0==WHITE? -8:8;
@@ -770,13 +706,9 @@ int KingSFTY(int c){
       int cntAtk;
       u = UNMAP(n1);
 
-      //if( (a1[u] & 15)==0 && g.color[u]!=c)
-      //    cntMoveKing++;
-
-
       cntAtk = a1[u] & 15;
       if( cntAtk ) score -= cntAtk;
-      else if(g.color[u]!=c) cntMoveKing++;
+      else if(g.pos[u]==0) cntMoveKing++;
       if(g.pos[u] == PAWN && g.color[u] == c)
       {
         const int pscr[] = {4,6,2,0,0,2,6,4};
@@ -889,17 +821,24 @@ int KingSFTY(int c){
        if(g.color[u] != c1)
          if(a1[u] & CNTRL_KNIGHT){
              cntCheck++;
-             if((cntMoveKing==0) & hasOpponent[QUEEN]) score -= 2; //угроза спертого мата
+             if(cntMoveKing==0) score -= 8; //угроза спертого мата
          }
      }
     }
 
-
+/*
+   switch(cntMoveKing){
+     case 0: fine = 8; score -= 2; break;
+     case 1: fine = 4; score -= 1; break;
+     case 2: fine = 2; break;
+     default: fine = 1;
+   }
+   score -= min(cntCheck*fine, 32);
+*/
    switch(cntMoveKing){
      case 0:
        score -= 4;
        if(cntCheck) score -= 8;
-       if(a1[u] & 15) score -= 16; //MATE :))
        break;
      case 1:
        score -= 2;

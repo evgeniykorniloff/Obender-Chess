@@ -6,8 +6,10 @@
 добавленные в результате поиска. В функции поиска таблица используется аналогично обычному хеше - ищутся узлы и их оценки.
 Вместо поиска может быть сделан библиотечный ход. Находятся все ходы, ведущие к библиотечным
 узлам и вычисляется приоритет для каждого хода. По результатам игры может производится самообучение -
-повышаться приоритет для выигравшей стороны и понижаться для проигравшей. */
+повышаться приоритет для выигравшей стороны и понижаться для проигравшей. 
+*/
 
+static int LEARN_START_VAL = 16;
 typedef struct LearnNode
 {
   int score, //оценка позиции (только для обсчитанных узлов - depth > 0)
@@ -17,7 +19,7 @@ typedef struct LearnNode
        size, //размер структуры (динамический - описание позиции может быть различным)
        isFromLib; //ход из библиотеки 1..0
   struct LearnNode * next; //следующий элемент списка
-  HashKey key; //хеш ключ позиции
+  HashKey key; //хеш ключ позиции    
   char epd[1]; //..size  строковое представление позиции
 }
 Node;
@@ -46,7 +48,7 @@ Node * NewLNode( char * epd )
 
   p->score = p->depth = 0; p->next = 0;
   p->isFromLib = 1;
-  p->learn = 16;
+  p->learn = LEARN_START_VAL;
   p->key = g.key;
   p->c = g.side;
   p->size = sizeof( Node ) + strlen( epd );
@@ -100,6 +102,7 @@ void ReadLibFile( char * fname )
   int StrToMove( char * s, Move * ret_mv );
 
   FILE * f = fopen( fname, "r" );
+  printf("# try load lib file\n");
   if ( f )
   {
     char s[0xFFFF], * strMv;
@@ -130,7 +133,9 @@ void ReadLibFile( char * fname )
     }
     fclose( f );
     g = save;
-  }
+  }else
+    printf("# lib file not found\n");
+
 
 }
 
@@ -155,9 +160,11 @@ void InsertNodeLearn( void )
   Node * SearchNode( int c, HashKey key );
   void MakeEpd( char epd[] );
   char epd[256];
-  Node * node = SearchNode( g.side, g.key );
 
+	
+  Node *node = SearchNode( g.side, g.key );
   MakeEpd( epd );
+	
   if ( node == NULL || strcmp( node->epd, epd ) != 0 )
   {
     Node * p = NewLNode( epd );
@@ -318,14 +325,23 @@ int PawnFirstExtMove( Move mv, int c )
   return 0;
 }
 
-/* список всех табличных ходов из данного узла */
-int ListLibMoves( int treeLow, int treeHigh, Node * v[], Move moves[], int * n )
+
+/* список всех табличных ходов из данного узла 
+   в v[] возвращает список позиций
+   в moves[] - ходы, ведущие в данные позиции
+   *n - кол-во найденных позиций
+   на вход:
+	   treeLow,treeHigh - начало, конец списка легальных
+	   ходов из данной позиции
+ */
+
+int ListLibMoves( int treeLow, int treeHigh, Node *v[], Move moves[], int *n )
 {
   Node * p;
   int j;
   char epd[1024];
 
-  * n = 0;
+  *n = 0;
   for ( j = treeLow; j <= treeHigh; j++ )
   {
     MakeMove( tree[j] );
@@ -351,43 +367,37 @@ int ListLibMoves( int treeLow, int treeHigh, Node * v[], Move moves[], int * n )
 
 
 
-/* ход из библиотеки - случайный выбор по приоритету */
+/* ход из библиотеки - случайный выбор по приоритету 
+   int treeLow, int treeHigh - номера первого и последнего
+   элемента в списке легальных ходов 
+*/
 Move MoveFromLib( int treeLow, int treeHigh )
 {
-  Node * v[512]; //lib. nodes
-  Move moves[512], mv = 0;
-  int n, add;
-
+  Node * v[1024]; //lib. nodes
+  Move moves[1024], mv = 0;
+  int n;// add;
+  srand(time(0));
   if ( ListLibMoves( treeLow, treeHigh, v, moves, & n ) )
   {
-
-    //найдем минимальный приоритет
-    do
-    {
-      int min = INT_MAX;
-      int j;
-      for ( j = 0; j < n; j++ )
-        if ( v[j]->isFromLib && v[j]->learn < min ) min = v[j]->learn;
-      add = 16 - min;
-    }
-    while ( 0 );
-
     //выберем ход
+    //из потомков с минимальным случайным приоритетом
+    //0x001
     do
     {
-      U64 Rand64( void );
-      int j, max = -1, tmp;
+      //U64 Rand64( void );
+      int j, min = INT_MAX-1, tmp;
       for ( j = 0; j < n; j++ )
-        if ( v[j]->isFromLib && ( tmp = Rand64() % ( v[j]->learn + add ) ) > max )
+        if ( v[j]            &&
+             v[j]->isFromLib && 
+           ( tmp = rand() % ( v[j]->learn  ) ) < min 
+           )
         {
-          max = tmp;
+          min = tmp;
           mv = moves[j];
         }
-
     }
     while ( 0 );
   }
-
   return mv;
 }
 
@@ -418,6 +428,7 @@ int SaveLearnTable( char * fname )
 и заносит каждую структуру в таблицу learn. */
 int LoadLearnTable( char * fname )
 {
+  int readCnt = 0;
   FILE *f = 0;
   f = fopen( fname, "rb" );
   if ( f )
@@ -426,7 +437,6 @@ int LoadLearnTable( char * fname )
     char * buf;
     int add_size, tmp;
     int f_size;
-    int readCnt = 0;
     //get file-size
     fseek( f, 0, SEEK_END );
     f_size = ftell( f );
@@ -457,33 +467,36 @@ int LoadLearnTable( char * fname )
 
 
   success:
-    fclose( f );
-    return 1;
-  error:
-    fclose( f );
+    if(f)fclose( f ),f=NULL;
+    if(readCnt==0)
+       fprintf(stderr,"#warning:  not load learn file!");
+    return  readCnt > 0;
+
+error:
+    fprintf(stderr,"#warning:  not load learn file! \n");
+    if(f)fclose( f ),f=NULL;
   }
+  if(f)fclose( f ),f=NULL;
   return 0;
-
-
 }
 
 
 void SaveSearchResult( int score, int depth )
 {
-  Node * p = learn[( int )g.key & ( SZ - 1 )];
+  Node * p;
   char epd[256];
 
+  p = learn[( int )g.key & ( SZ - 1 )];
   MakeEpd( epd );
   //поиск существующего узла
   while ( p )
   {
-    if ( p->key == g.key && p->c == g.side && strcmp( epd, p->epd ) == 0 )
+    if ( p->key == g.key && 
+         p->c == g.side && 
+         strcmp( epd, p->epd ) == 0 )
     {
-      if(depth>=p->depth)
-      {
-         p->depth = depth;
-         p->score = score;
-      }
+      p->depth = depth;
+      p->score = score;
       return;
     }
     p = p->next;
@@ -513,21 +526,28 @@ int LearnLook( int depth, int alpha, int beta, int * ret_score )
       MakeEpd( epd );
       if ( strcmp( epd, p->epd ) == 0 )
       {
-        if ( p->depth >= depth )
+        if ( p->depth >= depth ) //узел обсчитан ранее, можно использовать оценку
         {
-          * ret_score = p->score;
+          //*ret_score = p->score;
+           //вот здесь я позволил себе похулиганить
+           // p->score - реальная оценка
+           //  + [-3..3] вероятностный бонус из самообучения
+          *ret_score = p->score + (LEARN_START_VAL - p->learn)/(LEARN_START_VAL/3);
           return 1;
         }
-        else if ( p->isFromLib )
-        {
-          int margin = 16;
+        else if ( p->isFromLib ) 
+        { //0x002
+          int margin = LEARN_START_VAL;
+          int score = LEARN_START_VAL - p->learn; //p->learn [0..LEARN_START_VAL*2]
+                                                  // start = LEARN_START_VAL
           //узел из дебютной книги, но еще не обсчитан
           //предполагаемая оценка - 0
-          if ( 0 + margin <= alpha )
+          //изначально score=0, потом корректируется +-LEARN_START_VAL
+          if ( score + margin <= alpha )
           {
             * ret_score = alpha;
             return 1;
-          }else if ( 0 - margin >= beta )
+          }else if ( score - margin >= beta )
           {
             * ret_score = beta;
             return 1;
@@ -543,90 +563,115 @@ int LearnLook( int depth, int alpha, int beta, int * ret_score )
   return 0;
 }
 
-/* Самообучение: если оценка увеличивается несколько ходов (для
-одной стороны), то увеличивается приоритет ходов, ведущих в эту позицию */
+/* 
+   Самообучение: 
+     если оценка растет, 
+     то увеличивается приоритет ходов, 
+     ведущих в эту позицию  
+*/
+
 void TryLearn( void )
 {
-  const int N = 6;
+  const int Len = 10;//за сколько ходов растет
   Node * v[MAX_GAME + MAX_PLY];
   void MakeHistoryScore( Node * v[] );
   int FunctionUp( Node * v[], int n, int c );
   void IncLearnPV( Node * v[], int c, int inc );
 
-  if ( g.isLearn == 0 )
+  if ( g.isLearn < 10  &&
+       (
+       ((g.game_cnt&~1)==10  || (g.game_cnt&~1)==20) //чтобы часто не обучалась
+           ||
+       (g.game_cnt>=4 && g.isLearn==0)//первое обучение
+       )
+     )
   {
+    //0x001
     MakeHistoryScore( v );
-    if ( FunctionUp( v, N, g.side ) )
+    if( FunctionUp( v, Len, g.side ) )
     {
       IncLearnPV( v, g.side, 1 );
-      //IncLearnPV( v, g.xside, -1 );
-      g.isLearn = 1;
+      g.isLearn++;
     }
-    else if ( FunctionUp( v, N, g.xside ) )
+    else if ( FunctionUp( v, Len, g.xside ) )
     {
-     // IncLearnPV( v, g.xside, 1 );
-      IncLearnPV( v, g.side, -1 );
-      g.isLearn = 1;
+      IncLearnPV( v, g.xside, 1 );
+      g.isLearn++;
     }
 
   }
 }
 
-
+//0x001
 void MakeHistoryScore( Node * v[] )
 {
-  int j, c;
-
-  c = g.side;
+  int j;
   for ( j = g.game_cnt - 1; j >= 0; j-- )
   {
-    v[j] = SearchNode( c, g.key_list[j] );
-    c ^= 1;
+    if((v[j] = SearchNode( WHITE, g.key_list[j] ))==NULL)
+        v[j] = SearchNode( BLACK, g.key_list[j] );
   }
 }
 
-/* Функция возрастает, если X(n) > X(n - D) abs(X(n) - X(n-1)) < V
-
-D - 6 V - 24 */
-
-
-int FunctionUp( Node * v[], int n, int c )
-{
-  const int D = 6;
-  const int V = 24;
-  int k = 0, last_score, j;
-
-  if ( c == g.side ) j = g.game_cnt-1;
-  else
-    j = g.game_cnt - 2;
-
-  for ( ; j >= 0; j -= 2 )
+/* 
+   Средняя за период 
+здесь проблема в том, что массив v[] может
+содержать ходы введенные пользователем для
+которых нет Node самоообучения и оценок
+соответственно
+Т.е. 100% это самообучение работает
+корректно когда программа играет сама
+с собой и не использует первый ход
+из дебютного справочника !!!
+*/
+//0x001
+int SMA(Node *v[],int c, int len, int *result){
+  int j;
+  int cntFind,k;
+  *result=0;
+  
+  for ( cntFind=0,k=0, j=g.game_cnt-1; 
+        j >= 0 && k<len; 
+      j -= 1, k++ )
   {
-    Node * p = v[j];
-    if ( p && p->c == c && p->depth > 2 )
+    Node *p = v[j];
+    if( p && p->depth>0)//если узел есть и он был обсчитан
     {
-      int up = 1;
-      if ( j - D < 0 ) up = 0;
-      else if ( v[j - D] == NULL ) up = 0;
-      else if ( v[j - D]->depth < 2 ) up = 0;
-      else if ( v[j - D]->score >=  p->score ) up = 0;
-      else if ( k > 0 &&  !(p->score - V < last_score) ) up = 0;
-
-      if ( up == 0 ) return 0;
-      last_score = p->score;
-      k++;
-      if ( k == n )
-      {
-
-        return 1;
-      }
+       if(p->c==c){
+         *result += p->score;
+       }else{
+	 *result -= p->score;
+       }
+       cntFind++;
     }
-    else
-      return 0;
+    
   }
+  if(cntFind < 2)return 0;  //найдено меньше 2 реальных оценок-какая средняя?
+  if(k < len) return 0;//просканировано меньше заданной длины
+  if(cntFind < len/2) return 0;//если ход машины-ход игрока, то это условие выполнится
+  *result /= cntFind; //средняя оценка
+  return 1;
+}
 
+//0x001
+/*
+ Функция растет, если короткое скользящее среднее
+ больше 0 и больше длинного скользящего среднего
+*/
+int FunctionUp( Node * v[], int len, int c )
+{
+  int sma1,sma2;
+  if(SMA(v,c,len/2,&sma1)  &&
+     SMA(v,c,len,&sma2) &&
+     sma1 > 8 &&  // if sma1 > 0 ?   ;  8 - просто некоторый коридор около 0
+     sma1 > sma2
+     )
+     return 1;
   return 0;
 }
+
+
+
 
 /*
 Самообучение проводится только если
@@ -636,17 +681,20 @@ void IncLearnPV( Node * v[], int c, int inc )
 {
   int j;
   Node * p;
-
-  if(c==g.side) j = g.game_cnt-1;
-  else j = g.game_cnt-2;
-  for ( ; j >= 0; j-=2 )
-    if( (p = v[j])==NULL  ||  p->c != c) return;
-
-
-  if(c==g.side) j = g.game_cnt-1;
-  else j = g.game_cnt-2;
-  for ( ; j >= 0; j-=2 )
-      v[j]->learn += inc;
-
-
+  //0x001
+  for(j=g.game_cnt-1; j >= 0; j--)
+   if( (p = v[j])!=NULL)
+    if(p->c == c)
+     {
+       //0x002
+       if(p->learn+inc<=LEARN_START_VAL*2)
+         p->learn+=inc;
+       else
+         p->learn=LEARN_START_VAL*2;
+     }else{
+       if(p->learn-inc>=2) //2 оставляем чтобы вариант не совсем пропал
+         p->learn-=inc;
+       else
+         p->learn=2;
+     }
 }

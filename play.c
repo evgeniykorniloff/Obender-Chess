@@ -171,13 +171,6 @@ void PlayWinBoard( char * prog_dir )
 
 
       }
-      //??
-      else if( LEX_IS("a")){
-        int XTest( Root_Score *ret,int MaxMoves);
-        XTest(0,5);
-
-      }
-      //??
       else if ( LEX_IS( "go" ) && SearchMove( & search_result ) && InsertMoveInGame( search_result.mv ) )
       {
         char str_move[64];

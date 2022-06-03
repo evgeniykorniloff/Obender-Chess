@@ -21,7 +21,7 @@ int root_mtl[2];
 extern time_t start_time, curr_time, limit_time;
 extern int is_stop_search;
 extern U64 cnt_nodes;
- PVTree *pv_tree;
+  static PVTree *pv_tree;
 
 
 typedef struct
@@ -53,6 +53,7 @@ Line pv_line, killer, pv_killer;
 #define ROOT_MTL(c)  (root_mtl[c] - root_mtl[c^1])
 
 //0x001
+static int __cntFindNodeInLearnTbl;
 int Search( int alpha, int beta, int depth, int check,
             Line ret_pv_line, int lazy , int isTree, int useNull)
 {
@@ -91,7 +92,10 @@ int Search( int alpha, int beta, int depth, int check,
   else if ( StopSearch() ) return 0;
   else if ( ply > MAX_PLY - 4 ) return Evaluate( alpha, beta );
   else if ( ply > 0 && Repetition() ) return 0;
-  else if ( ply > 4 && s_depth>6 && !doNull && LearnLook( depth, alpha, beta, & score ) ) return score;
+  else if ( ply > 4 && s_depth>6 /*&& !doNull*/ && LearnLook( depth, alpha, beta, & score ) ){
+      __cntFindNodeInLearnTbl++;
+      return score;
+  }
   else if ( HashLook( alpha, beta, depth, & score, & vtr.hash_mv ) ) return score;
   else
   {
@@ -568,31 +572,6 @@ int Repetition( void )
 {
   int ci = g.game_cnt + ply - 1;
 
-  if ( ci >= 4 )
-  {
-    Move *mv = &g.game_list[ci];
-    HashKey *key = &g.key_list[ci];
-    int cnt = 0, rep = 0;
-    while ( mv >= g.game_list )
-    {
-      if ( cnt && (*key==g.key) && ((++rep == 2) | (ci >= g.game_cnt - 1)) ) 
-          return 1;
-      if ( (*mv & (CAPTURE | PROMOTE | LEFT_CASTL | RIGHT_CASTL)) | (*mv == 0) | (PIECE( *mv ) == PAWN) )
-        return 0;
-      cnt++; ci--;
-      if ( cnt == 50 ) return 1;
-      mv--; key--;
-    }
-  }
-  return 0;
-}
-
-
-/******
-int Repetition( void )
-{
-  int ci = g.game_cnt + ply - 1;
-
   //  return 0;
 
 
@@ -613,7 +592,6 @@ int Repetition( void )
   }
   return 0;
 }
-****/
 
 int NextMove( PhaseInfo * q, Move * ret_mv )
 {
@@ -820,7 +798,7 @@ int NextMove( PhaseInfo * q, Move * ret_mv )
   return 0;
 }
 
-/*****
+
 void Pick( int low, int high )
 {
   int m_i = low, max = sort_val[low], j;
@@ -837,19 +815,7 @@ void Pick( int low, int high )
     SWAP( tree[low], tree[m_i] );
   }
 }
-********/
 
-void Pick(int low, int high){
-  register int *p = sort_val+low, *stop=sort_val+high+1,
-      *max=p;
-  int tmp;
-  for(p++; p<stop; p++)
-    if(*p > *max) max=p; 
-
-  tmp=sort_val[low]; sort_val[low]=*max; *max=tmp;
-  max = tree + (max-sort_val);
-  tmp=tree[low];tree[low]=*max; *max=tmp;
-}
 
 
 void SavePvLine( Line dest, Line source, Move mv )
@@ -919,39 +885,9 @@ void SaveRootScore( int alpha, int beta, Move mv, int depth, Line line )
   assert( 0 );
 }
 
-
-int MakeRootListWithExcludeMoves(Move exclMoves[],int exclN )
-{
-  int j,k=0;
-  int XFindMove(Move mv,Move v[],int n);
-
-  memset( root_list, 0, sizeof( root_list ) );
-  LegalMoveList();
-
-  for ( j = 0; j < treeCnt[1]; j++ )
-  {
-    if(XFindMove(tree[j],exclMoves,exclN)==-1)    //нет хода из списка
-    {
-        Root_Score * p = & root_list[k];
-        p->mv = tree[j];
-        MakeMove( tree[j] );
-        p->depth = 0;
-        p->flag = EXACT;
-        p->score = -Evaluate( -INF, INF );
-        UnMakeMove( tree[j] );
-        tree[k]=tree[j];
-        k++;
-    }
-  }
-  return treeCnt[1]=k; //ходов легальных и без списка исключения
-}
-
-///////////////////////
 void MakeRootList( void )
 {
   int j;
-
-  srand(time(0));
   memset( root_list, 0, sizeof( root_list ) );
   LegalMoveList();
 
@@ -965,7 +901,7 @@ void MakeRootList( void )
 
     p->depth = 0;
     p->flag = EXACT;
-    p->score = -Evaluate( -INF, INF )   + rand()%7;    ;
+    p->score = -Evaluate( -INF, INF );
 
     UnMakeMove( tree[j] );
   }
@@ -1030,6 +966,7 @@ int SearchMove( Root_Score * ret )
   int old_score;
 
   //инициализация переменных для поиска
+  __cntFindNodeInLearnTbl = 0;
   root_white_mtl = g.mtl[WHITE] - g.mtl[BLACK];
   root_white_st_score = g.st_score[WHITE] - g.st_score[BLACK];//0x002
   TimeReset();
@@ -1079,7 +1016,7 @@ int SearchMove( Root_Score * ret )
     if ( rand() % ( N1 - N2 ) != 1 )
       if ( ( mv = MoveFromLib( treeCnt[0], treeCnt[1] - 1 ) ) != 0 )
       {
-        memset( ret, 9, sizeof( Root_Score ) );
+        memset( ret, 0, sizeof( Root_Score ) );
         ret->mv = mv;
         return 1;
       }
@@ -1160,7 +1097,8 @@ done:
   }while(0);
     */
   /////?????
-
+  //??
+  printf("#__cntFindNodeInLearnTbl=%d\n",__cntFindNodeInLearnTbl);
   return 1;
 }
 
