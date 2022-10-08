@@ -553,17 +553,22 @@ int Quies( int alpha, int beta )
 void SaveHist( Move mv, int alpha, int beta )
 {
   int incH = 1;
-  int * h = & history[g.side] [PIECE( mv )] [TO( mv )];
+  int *h = &history[g.side] [PIECE( mv )] [TO( mv )];
   if ( alpha < beta ) incH += 1;
+  if(alpha > VALUE_P*2) incH += 2;
+ // if(alpha > VALUE_P*2) incH += 1;
   if ( alpha > INF - 100 ){
-      incH += 4;
+      incH += 8;
       mate_history[g.side] [PIECE( mv )] [TO( mv )]++;
   }
  // if( *h < MIN_HIST ) *h = MIN_HIST;
-  if ( * h + incH < MAX_HIST ) ( * h ) += incH;
-  else
-    * h = MAX_HIST;
-
+  if ( *h + incH < MAX_HIST ) ( *h ) += incH;
+  else{
+    int j,k,n;
+    for(j=0;j<2;j++)for(k=0;k<8;k++)for(n=0;n<64;n++)
+        history[j][k][n] /= 2;
+    *h += incH;
+  }
   histMaxVal[g.side] = min( histMaxVal[g.side] + incH, MAX_HIST);
 }
 
@@ -1098,7 +1103,7 @@ done:
     */
   /////?????
   //??
-  printf("#__cntFindNodeInLearnTbl=%d\n",__cntFindNodeInLearnTbl);
+  //printf("#__cntFindNodeInLearnTbl=%d\n",__cntFindNodeInLearnTbl);
   return 1;
 }
 

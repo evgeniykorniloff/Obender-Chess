@@ -44,8 +44,8 @@ void PlayWinBoard( char * prog_dir )
 
 
   //init interface with arena (winboard)
-  printf( "feature setboard=1\n" );
-  printf( "feature done=1\n" );
+  //printf( "feature setboard=1\n" );
+  //printf( "feature done=1\n" );
 
 
   while ( fgets( s, sizeof( s ) - 1, stdin ) )
@@ -63,7 +63,13 @@ void PlayWinBoard( char * prog_dir )
         limit_time = atoi( s ) * 100;
         if ( limit_time <= 0 ) limit_time = 5 * 100;
       }
-      else if( LEX_IS( "time") )
+      else if( LEX_IS("xboard") ){
+          printf( "feature setboard=1\n" );
+          printf( "feature done=1\n" );
+          printf( "feature sigint=0\n" ); // only for Linux
+          printf( "feature sigterm=0\n" );  
+
+      }else if( LEX_IS( "time") )
       {
         extern time_t limit_time;
         char * s = strtok( 0, " \n" );
