@@ -4,13 +4,18 @@
 chess-engine for WinBoard(XBoard)
 copyrigh(c) Korniloff E,
 mail: evgeniy-korniloff@yandex.ru
-Last modified:  15.05.2022
+Last modified:  8.10.2022
 
 modified version 2.09.x
 
-compiler: Visual C 2010, or cd to obender_dir and type
+compile: 
+         Visual C 2010, or gcc
+         !WARNING     obender.exe  most be old, recompile!
 
-          gcc *.c -O3 -o obender
+         cd to obender_dir and type
+
+          gcc *.c -O3 -o obender         // LINUX
+          gcc *.c -O3 -o obender.exe     //WINDOWS
 
  
           *** Run the program with WinBoard ***
@@ -20,7 +25,7 @@ compiler: Visual C 2010, or cd to obender_dir and type
   1. open teminal cmd.exe
   2. cd obender_dir
   3. enter command
-       winboard.exe /fcp obender_exe_name.exe          
+       winboard.exe /fcp obender.exe          
        or
        click on start.cmd
        or on linux
