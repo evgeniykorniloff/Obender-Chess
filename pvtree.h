@@ -1,5 +1,5 @@
-#ifndef pvtree_includeu
-#define pvtree_includeu
+#ifndef pvtree_included
+#define pvtree_included
 
 #include "chess.h"
 

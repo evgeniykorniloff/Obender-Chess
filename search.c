@@ -1,5 +1,7 @@
 #include "chess.h"
 #include "pvtree.h"
+#include "time.h"
+#include "stdlib.h"
 //#define DEBUG
 
 /* typedef Move Line[MAX_PLY]; enum{ EMPTY,ALPHA,EXACT,BETA }; typedef struct{ int score,flag,depth; Line line; }CS;
@@ -552,13 +554,13 @@ int Quies( int alpha, int beta )
 
 void SaveHist( Move mv, int alpha, int beta )
 {
-  int incH = 1;
+  int incH = 1+rand()&1;
   int *h = &history[g.side] [PIECE( mv )] [TO( mv )];
   if ( alpha < beta ) incH += 1;
   if(alpha > VALUE_P*2) incH += 2;
  // if(alpha > VALUE_P*2) incH += 1;
   if ( alpha > INF - 100 ){
-      incH += 8;
+      incH += 5 + rand()&7;
       mate_history[g.side] [PIECE( mv )] [TO( mv )]++;
   }
  // if( *h < MIN_HIST ) *h = MIN_HIST;
