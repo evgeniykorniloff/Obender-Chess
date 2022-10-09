@@ -98,7 +98,10 @@ int Search( int alpha, int beta, int depth, int check,
       __cntFindNodeInLearnTbl++;
       return score;
   }
-  else if ( HashLook( alpha, beta, depth, & score, & vtr.hash_mv ) ) return score;
+  else if ( HashLook( alpha, beta, depth, & score, &vtr.hash_mv ) &&
+            !check
+          ) 
+      return score;
   else
   {
     int legalCnt = 0;
@@ -463,7 +466,14 @@ skipSearch:
 
     if ( legalCnt == 0 )
     {
+      int *h,incH;  
       if ( !check ) return 0; //STALEMATE
+      //save mate piece position
+      h = &history[g.xside] [PIECE( LastMove() )] [TO( LastMove() )];
+      incH = 5 + rand()&7;
+      if(*h + incH < MAX_HIST) *h += incH;
+      else *h = MAX_HIST;
+      
       return -INF + ply + 1; //MATE
     }
 
@@ -561,6 +571,8 @@ void SaveHist( Move mv, int alpha, int beta )
  // if(alpha > VALUE_P*2) incH += 1;
   if ( alpha > INF - 100 ){
       incH += 5 + rand()&7;
+      //??1
+      //printf("#------>\n");
       mate_history[g.side] [PIECE( mv )] [TO( mv )]++;
   }
  // if( *h < MIN_HIST ) *h = MIN_HIST;
