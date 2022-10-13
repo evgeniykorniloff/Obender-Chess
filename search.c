@@ -573,7 +573,8 @@ void SaveHist( Move mv, int alpha, int beta )
       incH += 5 + rand()&7;
       //??1
       //printf("#------>\n");
-      mate_history[g.side] [PIECE( mv )] [TO( mv )]++;
+      int *h1 = &mate_history[g.side][PIECE( mv )][TO( mv )];
+      if(*h1<MAX_HIST) (*h1)++;
   }
  // if( *h < MIN_HIST ) *h = MIN_HIST;
   if ( *h + incH < MAX_HIST ) ( *h ) += incH;
@@ -1160,13 +1161,32 @@ void MakeHistCutValue(void){
   }
 }
 
-
-void HistoryInit( void )
-{
+void HistoryClear(void){
    histMaxVal[WHITE] = histMaxVal[BLACK] = 0;
    histCutVal[WHITE] = histCutVal[BLACK] = 0;
    memset(history,0,sizeof(history));
-   memset(mate_history,0,sizeof(history));
+   memset(mate_history,0,sizeof(history));   
+}
+void HistoryInit( void )
+{
+    
+  if(g.game_cnt<3){
+     HistoryClear();
+     exit;
+  }
+  histMaxVal[WHITE] = histMaxVal[BLACK] = 0;
+  histCutVal[WHITE] = histCutVal[BLACK] = 0;
+  do
+  {
+    int c, p, sq;
+    for ( c = WHITE; c <= BLACK; c++ )
+      for ( p = PAWN; p <= KING; p++ )
+        for ( sq = 0; sq < 64; sq++ )
+        { 
+          int mh=mate_history[c][p][sq];
+          history[c][p][sq]=mh>0?rand()%(mh/2+1):0;
+        }
+  }while(0);
    /*
   //RESET HISTORY
   do
