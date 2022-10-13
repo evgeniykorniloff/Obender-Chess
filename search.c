@@ -473,7 +473,9 @@ skipSearch:
       incH = 5 + rand()&7;
       if(*h + incH < MAX_HIST) *h += incH;
       else *h = MAX_HIST;
-      
+
+      h = &mate_history[g.xside][PIECE( LastMove() )][TO( LastMove() )];
+      *h = min(MAX_HIST,*h+1);
       return -INF + ply + 1; //MATE
     }
 
@@ -1170,10 +1172,10 @@ void HistoryClear(void){
 void HistoryInit( void )
 {
     
-  if(g.game_cnt<3){
-     HistoryClear();
-     exit;
-  }
+  //if(g.game_cnt%40<3){
+  //   HistoryClear();
+  //   exit;
+  //}
   histMaxVal[WHITE] = histMaxVal[BLACK] = 0;
   histCutVal[WHITE] = histCutVal[BLACK] = 0;
   do
