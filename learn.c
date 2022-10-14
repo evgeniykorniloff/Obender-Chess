@@ -441,6 +441,11 @@ int LoadLearnTable( char * fname )
     fseek( f, 0, SEEK_END );
     f_size = ftell( f );
     fseek( f, 0, SEEK_SET );
+    if(f_size<1000000){
+      fclose(f); //где то потерялся полный файл
+      fprintf(stderr,"#warning:  learn file is corrupted!\n");
+      return 0;         
+    }
     //get memory
     buf = malloc( f_size );
     if ( buf == 0 )
