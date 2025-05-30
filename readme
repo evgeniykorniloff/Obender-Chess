@@ -41,7 +41,12 @@ run:
     >> chmod +x ./obender
     >> xboard -fcp ./obender &
 
-
+Windows:
+  gcc -O2 *.c -lm -o obender.exe
+OR
+ VIsual C++ Express
+Run:
+ WinBoard.exe \fcp obender.exe
     
 /////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////
