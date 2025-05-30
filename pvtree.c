@@ -21,7 +21,7 @@ PVNode** pvGetHashEntry(PVTree *tr,  HKey key){
    for( p = pvFindPosWithHash(tree,key,side); p; p = p->moves )
    {
      if( p->mv == ...
-
+   
    }
 
 */
@@ -29,13 +29,13 @@ PVNode* pvFindPosWithHash(PVTree *tr, HKey key, int side){
 
    PVNode *p, *find = 0;
    int max = -1000000;
-
+   
    for( p = *pvGetHashEntry(tr,key); p; p = p->hashList )
        if( p->key == key  &&  p->side == side ){
          if(p->prioritet > max){
            max = p->prioritet;
            find = p;
-         }
+         }  
        }
    return find;
 }
@@ -63,10 +63,10 @@ PVNode  **pvToFront(PVNode **p, PVNode **first){
 
   if( p && first && (*p) != (*first) ){
     PVNode *tmp = *p;
-
+    
     if(*first) tmp->prioritet = (*first)->prioritet + 1;
     else tmp->prioritet = 1;
-
+      
     *p = tmp->moves;  //исключен
     tmp->moves = *first;
     *first = tmp;     //включен в начало
@@ -105,12 +105,12 @@ PVNode *pvNewNode(PVTree *tr, int depth, int side, int score, int check, move mv
 PVNode **pvInsertToFront( PVTree* tr, PVNode** first, PVNode* p){
 
   if( first && p && (*first) != p){
-//    PVNode *tmp;
-
+    PVNode *tmp;
+    
     if(*first)  p->prioritet = (*first)->prioritet+1;
     else p->prioritet = 1;
 
-    p->moves = *first;
+    p->moves = *first; 
     *first = p;
     do{
       PVNode **h = pvGetHashEntry(tr,p->key);
@@ -131,21 +131,19 @@ PVNode **pvInsertToEnd( PVTree* tr, PVNode** first, PVNode* p){
      PVNode **list = first;
      int min_prioritet = 1000000;
      int find = 0;
-
+     
      while( *list ){
       if( (*list)->key == p->key  &&  (*list)->side == p->side )
-      {
        if( (*list)->prioritet < min_prioritet){
          min_prioritet = (*list)->prioritet;
          find = 1;
-       }
-      }
-      list = &(*list)->moves;
-     }
-
+       }  
+       list = &(*list)->moves;
+     }   
+     
      if(find) p->prioritet = min_prioritet - 1;
      else p->prioritet = 1;
-
+     
      p->moves = *list;
      *list = p;
 
@@ -153,8 +151,8 @@ PVNode **pvInsertToEnd( PVTree* tr, PVNode** first, PVNode* p){
        PVNode **h = pvGetHashEntry(tr,p->key);
        p->hashList = *h;
        *h = p;
-     }while(0);
-
+     }while(0);  
+     
      return list;
   }
 
@@ -174,7 +172,7 @@ PVNode **pvInsertToEnd( PVTree* tr, PVNode** first, PVNode* p){
  “ак как данна€ функци€ расточительна по времени, то в функции
  поиска ее имеет смысл вызывать только если
   pvFindPosWithHash(PVTree *tr, HKey key, int side) вернет не 0,
-  т.е. если веро€тность нахождени€ данной позиции достаточно высока
+  т.е. если веро€тность нахождени€ данной позиции достаточно высока    
 */
 PVNode **pvFindNodeTree( PVTree* tr, move game_list[], int cnt ){
   int j;
@@ -213,7 +211,7 @@ void pvPrint(PVNode *p, FILE *f){
       if( pvTable[y][x] ){
          find = 1;
          break;
-      }
+      }   
     }
     if(find == 0) break;
     for( x = 0; x < SIZE_X; x++ ){
@@ -234,7 +232,7 @@ void pvPrint(PVNode *p, FILE *f){
 void pvTreeToTable(PVNode *p, int x, int y){
    int GetFirstY(void);                 // весь узел печатаетс€ на одном X
    int cnt = 0;
-
+   
    while( p  &&  cnt < 3){
      if(x < SIZE_X  && y < SIZE_Y){
        pvTable[y][x] = p;               //печатаем первый ход по старому Y

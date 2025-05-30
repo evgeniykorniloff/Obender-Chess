@@ -2,32 +2,30 @@
 //#include <values.h>
 #include "chess.h"
 
-/* РўР°Р±Р»РёС†Р° СЃР°РјРѕРѕР±СѓС‡РµРЅРёСЏ РњРѕР¶РµС‚ СЃРѕРґРµСЂР¶Р°С‚СЊ РєР°Рє СѓР·Р»С‹ РёР· РґРµР±СЋС‚РЅРѕРіРѕ СЃРїСЂР°РІРѕС‡РЅРёРєР° (РЅРµРѕР±СЃС‡РёС‚Р°РЅРЅС‹Рµ), С‚Р°Рє Рё СѓР·Р»С‹,
-РґРѕР±Р°РІР»РµРЅРЅС‹Рµ РІ СЂРµР·СѓР»СЊС‚Р°С‚Рµ РїРѕРёСЃРєР°. Р’ С„СѓРЅРєС†РёРё РїРѕРёСЃРєР° С‚Р°Р±Р»РёС†Р° РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ Р°РЅР°Р»РѕРіРёС‡РЅРѕ РѕР±С‹С‡РЅРѕРјСѓ С…РµС€Рµ - РёС‰СѓС‚СЃСЏ СѓР·Р»С‹ Рё РёС… РѕС†РµРЅРєРё.
-Р’РјРµСЃС‚Рѕ РїРѕРёСЃРєР° РјРѕР¶РµС‚ Р±С‹С‚СЊ СЃРґРµР»Р°РЅ Р±РёР±Р»РёРѕС‚РµС‡РЅС‹Р№ С…РѕРґ. РќР°С…РѕРґСЏС‚СЃСЏ РІСЃРµ С…РѕРґС‹, РІРµРґСѓС‰РёРµ Рє Р±РёР±Р»РёРѕС‚РµС‡РЅС‹Рј
-СѓР·Р»Р°Рј Рё РІС‹С‡РёСЃР»СЏРµС‚СЃСЏ РїСЂРёРѕСЂРёС‚РµС‚ РґР»СЏ РєР°Р¶РґРѕРіРѕ С…РѕРґР°. РџРѕ СЂРµР·СѓР»СЊС‚Р°С‚Р°Рј РёРіСЂС‹ РјРѕР¶РµС‚ РїСЂРѕРёР·РІРѕРґРёС‚СЃСЏ СЃР°РјРѕРѕР±СѓС‡РµРЅРёРµ -
-РїРѕРІС‹С€Р°С‚СЊСЃСЏ РїСЂРёРѕСЂРёС‚РµС‚ РґР»СЏ РІС‹РёРіСЂР°РІС€РµР№ СЃС‚РѕСЂРѕРЅС‹ Рё РїРѕРЅРёР¶Р°С‚СЊСЃСЏ РґР»СЏ РїСЂРѕРёРіСЂР°РІС€РµР№. 
-*/
+/* Таблица самообучения Может содержать как узлы из дебютного справочника (необсчитанные), так и узлы,
+добавленные в результате поиска. В функции поиска таблица используется аналогично обычному хеше - ищутся узлы и их оценки.
+Вместо поиска может быть сделан библиотечный ход. Находятся все ходы, ведущие к библиотечным
+узлам и вычисляется приоритет для каждого хода. По результатам игры может производится самообучение -
+повышаться приоритет для выигравшей стороны и понижаться для проигравшей. */
 
-static int LEARN_START_VAL = 16;
 typedef struct LearnNode
 {
-  int score, //РѕС†РµРЅРєР° РїРѕР·РёС†РёРё (С‚РѕР»СЊРєРѕ РґР»СЏ РѕР±СЃС‡РёС‚Р°РЅРЅС‹С… СѓР·Р»РѕРІ - depth > 0)
-       learn, //РїСЂРёРѕСЂРёС‚РµС‚
-       c, //С‡РµР№ С…РѕРґ РѕР¶РёРґР°РµС‚СЃСЏ
-       depth, //РіР»СѓР±РёРЅР° РїРѕРёСЃРєР° (РµСЃР»Рё РїРѕРёСЃРєР° РЅРµ Р±С‹Р»Рѕ - 0)
-       size, //СЂР°Р·РјРµСЂ СЃС‚СЂСѓРєС‚СѓСЂС‹ (РґРёРЅР°РјРёС‡РµСЃРєРёР№ - РѕРїРёСЃР°РЅРёРµ РїРѕР·РёС†РёРё РјРѕР¶РµС‚ Р±С‹С‚СЊ СЂР°Р·Р»РёС‡РЅС‹Рј)
-       isFromLib; //С…РѕРґ РёР· Р±РёР±Р»РёРѕС‚РµРєРё 1..0
-  struct LearnNode * next; //СЃР»РµРґСѓСЋС‰РёР№ СЌР»РµРјРµРЅС‚ СЃРїРёСЃРєР°
-  HashKey key; //С…РµС€ РєР»СЋС‡ РїРѕР·РёС†РёРё    
-  char epd[1]; //..size  СЃС‚СЂРѕРєРѕРІРѕРµ РїСЂРµРґСЃС‚Р°РІР»РµРЅРёРµ РїРѕР·РёС†РёРё
+  int score, //оценка позиции (только для обсчитанных узлов - depth > 0)
+       learn, //приоритет
+       c, //чей ход ожидается
+       depth, //глубина поиска (если поиска не было - 0)
+       size, //размер структуры (динамический - описание позиции может быть различным)
+       isFromLib; //ход из библиотеки 1..0
+  struct LearnNode * next; //следующий элемент списка
+  HashKey key; //хеш ключ позиции
+  char epd[1]; //..size  строковое представление позиции
 }
 Node;
 
 
 
-#define SZ (1<<16)  //СЂР°Р·РјРµСЂ С‚Р°Р±Р»РёС†С‹ СѓРєР°Р·Р°С‚РµР»РµР№ (РЅР°С‡Р°Р»Р° СЃРїРёСЃРєРѕРІ)
-Node * learn[SZ]; //С…РµС€ С‚Р°Р±Р»РёС†Р° (РЅР°С‡Р°Р»Р° СЃРїРёСЃРєРѕРІ СѓРєР°Р·Р°С‚РµР»РµР№)
+#define SZ (1<<16)  //размер таблицы указателей (начала списков)
+Node * learn[SZ]; //хеш таблица (начала списков указателей)
 /*
 void LearnClear(void){
   memset(learn,0,sizeof(learn));
@@ -41,14 +39,14 @@ void LearnClear(void)
 }
 
 
-/* РЅРѕРІС‹Р№ СЌР»РµРјРµРЅС‚, РґРёРЅР°РјРёС‡РµСЃРєРёР№ СЂР°Р·РјРµСЂ */
+/* новый элемент, динамический размер */
 Node * NewLNode( char * epd )
 {
   Node * p = ( Node * ) malloc( sizeof( Node ) + strlen( epd ) );
 
   p->score = p->depth = 0; p->next = 0;
   p->isFromLib = 1;
-  p->learn = LEARN_START_VAL;
+  p->learn = 16;
   p->key = g.key;
   p->c = g.side;
   p->size = sizeof( Node ) + strlen( epd );
@@ -93,7 +91,7 @@ char * GetToken( TokType * p )
 }
 
 
-/* С‡РёС‚Р°РµС‚ С‚РµРєСЃС‚РѕРІС‹Р№ С„Р°Р№Р» Рё РґРѕР±Р°РІР»СЏРµС‚ РІ С‚Р°Р±Р»РёС†Сѓ */
+/* читает текстовый файл и добавляет в таблицу */
 void ReadLibFile( char * fname )
 {
   int GetStr( char * s, int n, FILE * f );
@@ -102,7 +100,6 @@ void ReadLibFile( char * fname )
   int StrToMove( char * s, Move * ret_mv );
 
   FILE * f = fopen( fname, "r" );
-  printf("# try load lib file\n");
   if ( f )
   {
     char s[0xFFFF], * strMv;
@@ -123,7 +120,7 @@ void ReadLibFile( char * fname )
       while ( ( strMv = GetToken( & t ) ) != NULL )
       {
         if ( StrToMove( strMv, & mv ) && InsertMoveInGame( mv ) )
-          InsertNodeLearn(); //С‚РµРєСѓС‰Р°СЏ РїРѕР·РёС†РёСЏ
+          InsertNodeLearn(); //текущая позиция
         else
         {
           printf( "#error: line %d, lexem %s\n", lines, strMv );
@@ -133,9 +130,7 @@ void ReadLibFile( char * fname )
     }
     fclose( f );
     g = save;
-  }else
-    printf("# lib file not found\n");
-
+  }
 
 }
 
@@ -154,17 +149,15 @@ int GetStr( char * s, int n, FILE * f )
 
 
 
-/* РІСЃС‚Р°РІР»СЏРµС‚ С‚РµРєСѓС‰СѓСЋ РїРѕР·РёС†РёСЋ */
+/* вставляет текущую позицию */
 void InsertNodeLearn( void )
 {
   Node * SearchNode( int c, HashKey key );
   void MakeEpd( char epd[] );
   char epd[256];
+  Node * node = SearchNode( g.side, g.key );
 
-	
-  Node *node = SearchNode( g.side, g.key );
   MakeEpd( epd );
-	
   if ( node == NULL || strcmp( node->epd, epd ) != 0 )
   {
     Node * p = NewLNode( epd );
@@ -186,7 +179,7 @@ Node * SearchNode( int c, HashKey key )
   return NULL;
 }
 
-/* СЃС‡РёС‚С‹РІР°РµС‚ С‚РµРєСѓС‰СѓСЋ РїРѕР·РёС†РёСЋ РІ С„РѕСЂРјР°С‚ epd(pen) r1bqkbnr/ppp1pppp/2n5/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq d3 0 3 */
+/* считывает текущую позицию в формат epd(pen) r1bqkbnr/ppp1pppp/2n5/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq d3 0 3 */
 
 void MakeEpd( char * s )
 {
@@ -200,7 +193,7 @@ void MakeEpd( char * s )
     }
   };
 
-  //СЃС‡РёС‚С‹РІР°РµРј РїРѕР·РёС†РёСЋ
+  //считываем позицию
   do
   {
     int x, y, cnt;
@@ -228,14 +221,14 @@ void MakeEpd( char * s )
   while ( 0 );
 
 
-  //С‡РµР№ С…РѕРґ РѕР¶РёРґР°РµС‚СЃСЏ
+  //чей ход ожидается
   * s++ = ' ';
   if ( g.side == WHITE ) * s++ = 'w';
   else
     * s++ = 'b';
   * s++ = ' ';
 
-  //РґРѕСЃС‚СѓРїРЅРѕСЃС‚СЊ СЂРѕРєРёСЂРѕРІРѕРє
+  //доступность рокировок
   do
   {
     int LeftCastlEnable( int c );
@@ -251,8 +244,8 @@ void MakeEpd( char * s )
   }
   while ( 0 );
   * s++ = ' ';
-  //РµСЃР»Рё РїРѕСЃР»РµРґРЅРёР№ С…РѕРґ - РїРµС€РєРѕР№ С‡РµСЂРµР· РєР»РµС‚РєСѓ,
-  //С‚Рѕ РѕР±РѕР·РЅР°С‡РёРј РїРѕР»Рµ РґР»СЏ РіРµРЅРµСЂР°С†РёРё РІР·СЏС‚РёСЏ С‡РµСЂРµР· Р±РёС‚РѕРµ РїРѕР»Рµ
+  //если последний ход - пешкой через клетку,
+  //то обозначим поле для генерации взятия через битое поле
 
   do
   {
@@ -271,7 +264,7 @@ void MakeEpd( char * s )
   while ( 0 );
 
 
-  /* СѓРґР°Р»РёРј РєРѕРЅРµС‡РЅС‹Рµ РїСЂРѕР±РµР»С‹ Рё РїСЂРѕС‡РµСЂРєРё */
+  /* удалим конечные пробелы и прочерки */
   for ( s--; * s == ' ' || * s == '-'; s-- );
   s++;
   * s = '\0';
@@ -316,32 +309,20 @@ int PawnFirstExtMove( Move mv, int c )
 {
   if ( PIECE( mv ) == PAWN )
   {
-    if (
-       ( ROW( FROM( mv ) )   ==  (( c == WHITE ) ? 6 : 1) ) &&
-       ( ROW( TO( mv ) )     ==  (( c == WHITE ) ? 4 : 3)
-       ) )
+    if ( ( ROW( FROM( mv ) ) == ( c == WHITE ) ? 6 : 1 ) && ( ROW( TO( mv ) ) == ( c == WHITE ) ? 4 : 3 ) )
       return 1;
   }
   return 0;
 }
 
-
-/* СЃРїРёСЃРѕРє РІСЃРµС… С‚Р°Р±Р»РёС‡РЅС‹С… С…РѕРґРѕРІ РёР· РґР°РЅРЅРѕРіРѕ СѓР·Р»Р° 
-   РІ v[] РІРѕР·РІСЂР°С‰Р°РµС‚ СЃРїРёСЃРѕРє РїРѕР·РёС†РёР№
-   РІ moves[] - С…РѕРґС‹, РІРµРґСѓС‰РёРµ РІ РґР°РЅРЅС‹Рµ РїРѕР·РёС†РёРё
-   *n - РєРѕР»-РІРѕ РЅР°Р№РґРµРЅРЅС‹С… РїРѕР·РёС†РёР№
-   РЅР° РІС…РѕРґ:
-	   treeLow,treeHigh - РЅР°С‡Р°Р»Рѕ, РєРѕРЅРµС† СЃРїРёСЃРєР° Р»РµРіР°Р»СЊРЅС‹С…
-	   С…РѕРґРѕРІ РёР· РґР°РЅРЅРѕР№ РїРѕР·РёС†РёРё
- */
-
-int ListLibMoves( int treeLow, int treeHigh, Node *v[], Move moves[], int *n )
+/* список всех табличных ходов из данного узла */
+int ListLibMoves( int treeLow, int treeHigh, Node * v[], Move moves[], int * n )
 {
   Node * p;
   int j;
   char epd[1024];
 
-  *n = 0;
+  * n = 0;
   for ( j = treeLow; j <= treeHigh; j++ )
   {
     MakeMove( tree[j] );
@@ -367,37 +348,43 @@ int ListLibMoves( int treeLow, int treeHigh, Node *v[], Move moves[], int *n )
 
 
 
-/* С…РѕРґ РёР· Р±РёР±Р»РёРѕС‚РµРєРё - СЃР»СѓС‡Р°Р№РЅС‹Р№ РІС‹Р±РѕСЂ РїРѕ РїСЂРёРѕСЂРёС‚РµС‚Сѓ 
-   int treeLow, int treeHigh - РЅРѕРјРµСЂР° РїРµСЂРІРѕРіРѕ Рё РїРѕСЃР»РµРґРЅРµРіРѕ
-   СЌР»РµРјРµРЅС‚Р° РІ СЃРїРёСЃРєРµ Р»РµРіР°Р»СЊРЅС‹С… С…РѕРґРѕРІ 
-*/
+/* ход из библиотеки - случайный выбор по приоритету */
 Move MoveFromLib( int treeLow, int treeHigh )
 {
-  Node * v[1024]; //lib. nodes
-  Move moves[1024], mv = 0;
-  int n;// add;
-  srand(time(0));
+  Node * v[512]; //lib. nodes
+  Move moves[512], mv = 0;
+  int n, add;
+
   if ( ListLibMoves( treeLow, treeHigh, v, moves, & n ) )
   {
-    //РІС‹Р±РµСЂРµРј С…РѕРґ
-    //РёР· РїРѕС‚РѕРјРєРѕРІ СЃ РјРёРЅРёРјР°Р»СЊРЅС‹Рј СЃР»СѓС‡Р°Р№РЅС‹Рј РїСЂРёРѕСЂРёС‚РµС‚РѕРј
-    //0x001
+
+    //найдем минимальный приоритет
     do
     {
-      //U64 Rand64( void );
-      int j, min = INT_MAX-1, tmp;
+      int min = INT_MAX;
+      int j;
       for ( j = 0; j < n; j++ )
-        if ( v[j]            &&
-             v[j]->isFromLib && 
-           ( tmp = rand() % ( v[j]->learn  ) ) < min 
-           )
+        if ( v[j]->isFromLib && v[j]->learn < min ) min = v[j]->learn;
+      add = 16 - min;
+    }
+    while ( 0 );
+
+    //выберем ход
+    do
+    {
+      U64 Rand64( void );
+      int j, max = -1, tmp;
+      for ( j = 0; j < n; j++ )
+        if ( v[j]->isFromLib && ( tmp = Rand64() % ( v[j]->learn + add ) ) > max )
         {
-          min = tmp;
+          max = tmp;
           mv = moves[j];
         }
+
     }
     while ( 0 );
   }
+
   return mv;
 }
 
@@ -419,33 +406,28 @@ int SaveLearnTable( char * fname )
     }
 
     fclose( f );
+    fflush(f);
     return 1;
   }
   return 0;
 }
 
-/* Р§РёС‚Р°РµС‚ С„Р°Р№Р», РїСЂРµРґСЃС‚Р°РІР»СЏСЋС‰РёР№ СЃРѕР±РѕР№ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅСѓСЋ Р·Р°РїРёСЃСЊ СЃС‚СЂСѓРєС‚СѓСЂ Node, (РєР°Р¶РґР°СЏ СЃС‚СЂСѓРєС‚СѓСЂР° РёРјРµРµС‚ РїРµСЂРµРјРµРЅРЅС‹Р№ СЂР°Р·РјРµСЂ)
-Рё Р·Р°РЅРѕСЃРёС‚ РєР°Р¶РґСѓСЋ СЃС‚СЂСѓРєС‚СѓСЂСѓ РІ С‚Р°Р±Р»РёС†Сѓ learn. */
+/* Читает файл, представляющий собой последовательную запись структур Node, (каждая структура имеет переменный размер)
+и заносит каждую структуру в таблицу learn. */
 int LoadLearnTable( char * fname )
 {
-  int readCnt = 0;
-  FILE *f = 0;
-  f = fopen( fname, "rb" );
+  FILE * f = fopen( fname, "rb" );
   if ( f )
   {
     Node * p;
     char * buf;
     int add_size, tmp;
     int f_size;
+    int readCnt = 0;
     //get file-size
     fseek( f, 0, SEEK_END );
     f_size = ftell( f );
     fseek( f, 0, SEEK_SET );
-    if(f_size<2000000){
-      fclose(f); //РіРґРµ С‚Рѕ РїРѕС‚РµСЂСЏР»СЃСЏ РїРѕР»РЅС‹Р№ С„Р°Р№Р»
-      fprintf(stderr,"#warning:  learn file is corrupted!\n");
-      return 0;         
-    }
     //get memory
     buf = malloc( f_size );
     if ( buf == 0 )
@@ -472,33 +454,27 @@ int LoadLearnTable( char * fname )
 
 
   success:
-    if(f)fclose( f ),f=NULL;
-    if(readCnt==0)
-       fprintf(stderr,"#warning:  not load learn file!");
-    return  readCnt > 0;
-
-error:
-    fprintf(stderr,"#warning:  not load learn file! \n");
-    if(f)fclose( f ),f=NULL;
+    fclose( f );
+    return 1;
+  error:
+    fclose( f );
   }
-  if(f)fclose( f ),f=NULL;
   return 0;
+
+
 }
 
 
 void SaveSearchResult( int score, int depth )
 {
-  Node * p;
+  Node * p = learn[( int )g.key & ( SZ - 1 )];
   char epd[256];
 
-  p = learn[( int )g.key & ( SZ - 1 )];
   MakeEpd( epd );
-  //РїРѕРёСЃРє СЃСѓС‰РµСЃС‚РІСѓСЋС‰РµРіРѕ СѓР·Р»Р°
+  //поиск существующего узла
   while ( p )
   {
-    if ( p->key == g.key && 
-         p->c == g.side && 
-         strcmp( epd, p->epd ) == 0 )
+    if ( p->key == g.key && p->c == g.side && strcmp( epd, p->epd ) == 0 )
     {
       p->depth = depth;
       p->score = score;
@@ -506,7 +482,7 @@ void SaveSearchResult( int score, int depth )
     }
     p = p->next;
   }
-  //РІСЃС‚Р°РІР»СЏРµРј РЅРѕРІС‹Р№ СѓР·РµР»
+  //вставляем новый узел
   p = NewLNode( epd );
   p->next = learn[( int )g.key & ( SZ - 1 )];
   learn[( int )g.key & ( SZ - 1 )] = p;
@@ -518,7 +494,7 @@ void SaveSearchResult( int score, int depth )
   p->isFromLib = 0;
 }
 
-/* РїРѕРёСЃРє СЂРµР·СѓР»СЊС‚Р°С‚Р° РІ С„СѓРЅРєС†РёРё РїРѕРёСЃРєР° */
+/* поиск результата в функции поиска */
 int LearnLook( int depth, int alpha, int beta, int * ret_score )
 {
   Node * p = learn[( int )g.key & ( SZ - 1 )];
@@ -531,28 +507,21 @@ int LearnLook( int depth, int alpha, int beta, int * ret_score )
       MakeEpd( epd );
       if ( strcmp( epd, p->epd ) == 0 )
       {
-        if ( p->depth >= depth ) //СѓР·РµР» РѕР±СЃС‡РёС‚Р°РЅ СЂР°РЅРµРµ, РјРѕР¶РЅРѕ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ РѕС†РµРЅРєСѓ
+        if ( p->depth >= depth )
         {
-          //*ret_score = p->score;
-           //РІРѕС‚ Р·РґРµСЃСЊ СЏ РїРѕР·РІРѕР»РёР» СЃРµР±Рµ РїРѕС…СѓР»РёРіР°РЅРёС‚СЊ
-           // p->score - СЂРµР°Р»СЊРЅР°СЏ РѕС†РµРЅРєР°
-           //  + [-3..3] РІРµСЂРѕСЏС‚РЅРѕСЃС‚РЅС‹Р№ Р±РѕРЅСѓСЃ РёР· СЃР°РјРѕРѕР±СѓС‡РµРЅРёСЏ
-          *ret_score = p->score + (LEARN_START_VAL - p->learn)/(LEARN_START_VAL/3);
+          * ret_score = p->score;
           return 1;
         }
-        else if ( p->isFromLib ) 
-        { //0x002
-          int margin = LEARN_START_VAL;
-          int score = LEARN_START_VAL - p->learn; //p->learn [0..LEARN_START_VAL*2]
-                                                  // start = LEARN_START_VAL
-          //СѓР·РµР» РёР· РґРµР±СЋС‚РЅРѕР№ РєРЅРёРіРё, РЅРѕ РµС‰Рµ РЅРµ РѕР±СЃС‡РёС‚Р°РЅ
-          //РїСЂРµРґРїРѕР»Р°РіР°РµРјР°СЏ РѕС†РµРЅРєР° - 0
-          //РёР·РЅР°С‡Р°Р»СЊРЅРѕ score=0, РїРѕС‚РѕРј РєРѕСЂСЂРµРєС‚РёСЂСѓРµС‚СЃСЏ +-LEARN_START_VAL
-          if ( score + margin <= alpha )
+        else if ( p->isFromLib )
+        {
+          int margin = 16;
+          //узел из дебютной книги, но еще не обсчитан
+          //предполагаемая оценка - 0
+          if ( 0 + margin <= alpha )
           {
             * ret_score = alpha;
             return 1;
-          }else if ( score - margin >= beta )
+          }else if ( 0 - margin >= beta )
           {
             * ret_score = beta;
             return 1;
@@ -568,138 +537,110 @@ int LearnLook( int depth, int alpha, int beta, int * ret_score )
   return 0;
 }
 
-/* 
-   РЎР°РјРѕРѕР±СѓС‡РµРЅРёРµ: 
-     РµСЃР»Рё РѕС†РµРЅРєР° СЂР°СЃС‚РµС‚, 
-     С‚Рѕ СѓРІРµР»РёС‡РёРІР°РµС‚СЃСЏ РїСЂРёРѕСЂРёС‚РµС‚ С…РѕРґРѕРІ, 
-     РІРµРґСѓС‰РёС… РІ СЌС‚Сѓ РїРѕР·РёС†РёСЋ  
-*/
-
+/* Самообучение: если оценка увеличивается несколько ходов (для
+одной стороны), то увеличивается приоритет ходов, ведущих в эту позицию */
 void TryLearn( void )
 {
-  const int Len = 10;//Р·Р° СЃРєРѕР»СЊРєРѕ С…РѕРґРѕРІ СЂР°СЃС‚РµС‚
+  const N = 6;
   Node * v[MAX_GAME + MAX_PLY];
   void MakeHistoryScore( Node * v[] );
   int FunctionUp( Node * v[], int n, int c );
   void IncLearnPV( Node * v[], int c, int inc );
 
-  if ( g.isLearn < 10  &&
-       (
-       ((g.game_cnt&~1)==10  || (g.game_cnt&~1)==20) //С‡С‚РѕР±С‹ С‡Р°СЃС‚Рѕ РЅРµ РѕР±СѓС‡Р°Р»Р°СЃСЊ
-           ||
-       (g.game_cnt>=4 && g.isLearn==0)//РїРµСЂРІРѕРµ РѕР±СѓС‡РµРЅРёРµ
-       )
-     )
+  if ( g.isLearn == 0 )
   {
-    //0x001
     MakeHistoryScore( v );
-    if( FunctionUp( v, Len, g.side ) )
+    if ( FunctionUp( v, N, g.side ) )
     {
       IncLearnPV( v, g.side, 1 );
-      g.isLearn++;
+      //IncLearnPV( v, g.xside, -1 );
+      g.isLearn = 1;
     }
-    else if ( FunctionUp( v, Len, g.xside ) )
+    else if ( FunctionUp( v, N, g.xside ) )
     {
-      IncLearnPV( v, g.xside, 1 );
-      g.isLearn++;
+     // IncLearnPV( v, g.xside, 1 );
+      IncLearnPV( v, g.side, -1 );
+      g.isLearn = 1;
     }
 
   }
 }
 
-//0x001
+
 void MakeHistoryScore( Node * v[] )
 {
-  int j;
+  int j, c;
+
+  c = g.side;
   for ( j = g.game_cnt - 1; j >= 0; j-- )
   {
-    if((v[j] = SearchNode( WHITE, g.key_list[j] ))==NULL)
-        v[j] = SearchNode( BLACK, g.key_list[j] );
+    v[j] = SearchNode( c, g.key_list[j] );
+    c ^= 1;
   }
 }
 
-/* 
-   РЎСЂРµРґРЅСЏСЏ Р·Р° РїРµСЂРёРѕРґ 
-Р·РґРµСЃСЊ РїСЂРѕР±Р»РµРјР° РІ С‚РѕРј, С‡С‚Рѕ РјР°СЃСЃРёРІ v[] РјРѕР¶РµС‚
-СЃРѕРґРµСЂР¶Р°С‚СЊ С…РѕРґС‹ РІРІРµРґРµРЅРЅС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»РµРј РґР»СЏ
-РєРѕС‚РѕСЂС‹С… РЅРµС‚ Node СЃР°РјРѕРѕРѕР±СѓС‡РµРЅРёСЏ Рё РѕС†РµРЅРѕРє
-СЃРѕРѕС‚РІРµС‚СЃС‚РІРµРЅРЅРѕ
-Рў.Рµ. 100% СЌС‚Рѕ СЃР°РјРѕРѕР±СѓС‡РµРЅРёРµ СЂР°Р±РѕС‚Р°РµС‚
-РєРѕСЂСЂРµРєС‚РЅРѕ РєРѕРіРґР° РїСЂРѕРіСЂР°РјРјР° РёРіСЂР°РµС‚ СЃР°РјР°
-СЃ СЃРѕР±РѕР№ Рё РЅРµ РёСЃРїРѕР»СЊР·СѓРµС‚ РїРµСЂРІС‹Р№ С…РѕРґ
-РёР· РґРµР±СЋС‚РЅРѕРіРѕ СЃРїСЂР°РІРѕС‡РЅРёРєР° !!!
-*/
-//0x001
-int SMA(Node *v[],int c, int len, int *result){
-  int j;
-  int cntFind,k;
-  *result=0;
-  
-  for ( cntFind=0,k=0, j=g.game_cnt-1; 
-        j >= 0 && k<len; 
-      j -= 1, k++ )
-  {
-    Node *p = v[j];
-    if( p && p->depth>0)//РµСЃР»Рё СѓР·РµР» РµСЃС‚СЊ Рё РѕРЅ Р±С‹Р» РѕР±СЃС‡РёС‚Р°РЅ
-    {
-       if(p->c==c){
-         *result += p->score;
-       }else{
-	 *result -= p->score;
-       }
-       cntFind++;
-    }
-    
-  }
-  if(cntFind < 2)return 0;  //РЅР°Р№РґРµРЅРѕ РјРµРЅСЊС€Рµ 2 СЂРµР°Р»СЊРЅС‹С… РѕС†РµРЅРѕРє-РєР°РєР°СЏ СЃСЂРµРґРЅСЏСЏ?
-  if(k < len) return 0;//РїСЂРѕСЃРєР°РЅРёСЂРѕРІР°РЅРѕ РјРµРЅСЊС€Рµ Р·Р°РґР°РЅРЅРѕР№ РґР»РёРЅС‹
-  if(cntFind < len/2) return 0;//РµСЃР»Рё С…РѕРґ РјР°С€РёРЅС‹-С…РѕРґ РёРіСЂРѕРєР°, С‚Рѕ СЌС‚Рѕ СѓСЃР»РѕРІРёРµ РІС‹РїРѕР»РЅРёС‚СЃСЏ
-  *result /= cntFind; //СЃСЂРµРґРЅСЏСЏ РѕС†РµРЅРєР°
-  return 1;
-}
+/* Функция возрастает, если X(n) > X(n - D) abs(X(n) - X(n-1)) < V
 
-//0x001
-/*
- Р¤СѓРЅРєС†РёСЏ СЂР°СЃС‚РµС‚, РµСЃР»Рё РєРѕСЂРѕС‚РєРѕРµ СЃРєРѕР»СЊР·СЏС‰РµРµ СЃСЂРµРґРЅРµРµ
- Р±РѕР»СЊС€Рµ 0 Рё Р±РѕР»СЊС€Рµ РґР»РёРЅРЅРѕРіРѕ СЃРєРѕР»СЊР·СЏС‰РµРіРѕ СЃСЂРµРґРЅРµРіРѕ
-*/
-int FunctionUp( Node * v[], int len, int c )
+D - 6 V - 24 */
+
+
+int FunctionUp( Node * v[], int n, int c )
 {
-  int sma1,sma2;
-  if(SMA(v,c,len/2,&sma1)  &&
-     SMA(v,c,len,&sma2) &&
-     sma1 > 8 &&  // if sma1 > 0 ?   ;  8 - РїСЂРѕСЃС‚Рѕ РЅРµРєРѕС‚РѕСЂС‹Р№ РєРѕСЂРёРґРѕСЂ РѕРєРѕР»Рѕ 0
-     sma1 > sma2
-     )
-     return 1;
+  const D = 6;
+  const V = 24;
+  int k = 0, last_score, j;
+
+  if ( c == g.side ) j = g.game_cnt-1;
+  else
+    j = g.game_cnt - 2;
+
+  for ( ; j >= 0; j -= 2 )
+  {
+    Node * p = v[j];
+    if ( p && p->c == c && p->depth > 2 )
+    {
+      int up = 1;
+      if ( j - D < 0 ) up = 0;
+      else if ( v[j - D] == NULL ) up = 0;
+      else if ( v[j - D]->depth < 2 ) up = 0;
+      else if ( v[j - D]->score >=  p->score ) up = 0;
+      else if ( k > 0 &&  !(p->score - V < last_score) ) up = 0;
+
+      if ( up == 0 ) return 0;
+      last_score = p->score;
+      k++;
+      if ( k == n )
+      {
+
+        return 1;
+      }
+    }
+    else
+      return 0;
+  }
+
   return 0;
 }
 
-
-
-
 /*
-РЎР°РјРѕРѕР±СѓС‡РµРЅРёРµ РїСЂРѕРІРѕРґРёС‚СЃСЏ С‚РѕР»СЊРєРѕ РµСЃР»Рё
-РІСЃСЏ СЃС‚СЂРѕРєР° РѕСЃРјС‹СЃР»РµРЅР°
+Самообучение проводится только если
+вся строка осмыслена
 */
 void IncLearnPV( Node * v[], int c, int inc )
 {
   int j;
   Node * p;
-  //0x001
-  for(j=g.game_cnt-1; j >= 0; j--)
-   if( (p = v[j])!=NULL)
-    if(p->c == c)
-     {
-       //0x002
-       if(p->learn+inc<=LEARN_START_VAL*2)
-         p->learn+=inc;
-       else
-         p->learn=LEARN_START_VAL*2;
-     }else{
-       if(p->learn-inc>=2) //2 РѕСЃС‚Р°РІР»СЏРµРј С‡С‚РѕР±С‹ РІР°СЂРёР°РЅС‚ РЅРµ СЃРѕРІСЃРµРј РїСЂРѕРїР°Р»
-         p->learn-=inc;
-       else
-         p->learn=2;
-     }
+
+  if(c==g.side) j = g.game_cnt-1;
+  else j = g.game_cnt-2;
+  for ( ; j >= 0; j-=2 )
+    if( (p = v[j])==NULL  ||  p->c != c) return;
+
+
+  if(c==g.side) j = g.game_cnt-1;
+  else j = g.game_cnt-2;
+  for ( ; j >= 0; j-=2 )
+      v[j]->learn += inc;
+
+
 }

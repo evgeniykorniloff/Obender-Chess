@@ -1,39 +1,45 @@
-/*
- * main.c
- * Copyright (C) 2022 - Evgeniy
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
-
 //#include <condefs.h>
 #include <string.h>
-
+#include <stdio.h>
 
 #ifdef __BORLANDC__
   #pragma argsused
 #endif
-//#pragma comment(linker, "/STACK:2000000")
-//#pragma comment(linker, "/HEAP:2000000")
-
 
 extern  void PlayWinBoard(char *prog_dir);
-int main(int argc, char **argv)
+
+
+void print_info(void)
+{
+ int msg[] = {
+   'C'<<1, 'h'<<1, 'e'<<1, 's'<<1, 's'<<1, ' '<<1,
+   'b'<<1, 'y'<<1, ' '<<1,
+   'N'<<1, 'i'<<1, 'f'<<1, 'o'<<1, 'n'<<1, 't'<<1, ' '<<1, 'I'<<1,
+   //'K'<<1, 'o'<<1, 'r'<<1, 'n'<<1, 'i'<<1, 'l'<<1,
+   //'o'<<1, 'f'<<1, 'f'<<1, ' '<<1, 'E'<<1, 
+   0 };
+   int j;
+
+
+   for(j = 0; msg[j]; j++)
+	   printf("%c", msg[j]>>1);
+
+   printf("\n");
+   
+}
+
+
+
+int main(int argc, char *argv[])
 {
 
   char dir[1024];
 
+
+  setbuf( stdout, NULL );
+  setbuf( stdin, NULL );
+
+  print_info();
 
   strcpy(dir,argv[0]);
 

@@ -1,0 +1,110 @@
+charset - cyrrilic cp-1251 and utf8
+
+
+Тут  прошло 20 лет, е мое,
+ 1.подправил xboard баг и прога опять запускается
+ 2.Добавил Монте-Карло подобный поиск матов - матовую таблицу истории
+   с памятью от предыдущего хода
+ 3.Добавил GSR - сокращение поиска по случайному генетическому алгоритму.
+   первый и шахи не сокращаются,
+   потом до случайой метки + взятия и (моментум-материал(5) > 0)
+     сокращаются на 1
+   остальные - на 2.
+   --------------
+    Играю - мне нравится. Есть и другой вариант сокращения на 2.
+    тоже за случайной меткой, не взятия и средняя по материалу 
+    с периодом 5 
+    меньше альфа на 2 пешки. Работает но несколько туговато думает
+    и 3 в конце желательно не сокращать.
+   Обнаружил что сокращения даже на 2 лучше использовать для всех ply
+   от начала.
+
+
+/////////////////////////////
+оценка за мобильность и шахи как функция от SIN
+
+
+3.2.4.X
+  INC ALPHA IN MAIN SEARCH
+  ДОБАВИЛ Taxi для королевы
+
+/////////////////////////
+remove futilityu prun
+
+
+что то вроде траекторий
+change history value
+   (hist_to << 14) + hist_from_to
+
+
+///////////  good seach key-positions +50 ELO?
+add SaveHistFail function
+change NextMove
++ history_from
+
+
+
+
+3.2.5.
+
+
+ "Дао рождает одно, 
+  одно рождает два, 
+  два рождает три, 
+  три рождает все вещи."
+          Лао-Цзы
+
+  do{  PVS---> LMR(1)---> LMR(2) ---> LMR(3) } 
+  2 full search & futility_pruning---> quies
+
+
+
+
+3.2.4
+inc margin null search  ----> value_p /2
+
+
+добавил futility_prun margin = 2*VALUE_P
+repetition return -8 ---> for side==root_side
+
+
+
+
+ нашел ошибку в статическом отсечении ---Ю упростил поиск
+
+selectiv_search - lmr + doReduction ---> фактически 2 функции поиска
+main_search - PVS
+futility + razoring
+
+
+
+
+
+Изменил алгорит поиска - добавил main_search,
+удалил recapture, margin reduction = 2*VALUE_P
+
+перекомпилировал на Visual C, изменил GetFirst +20-30%
+добавил тест на проверку второго запуска программы и порчи из за этого файла learn
+
+
+//////////// 3.1.2 ///////////
+ result:
+   стало немного быстрее и жестче, но 3.1.0 играла осторожнее.
+   + (hard & speed) - caution
+
+1. --->function search
+  remove check reductions depth <= 2
+   /*************
+        if(ply <= s_depth && (mv & CAPTURE) && (last&CAPTURE) && TO(mv)==TO(last))
+        {
+          if( value[ g.tag_list[g.game_cnt + ply-1].cap_p  ] ==
+              value[ g.tag_list[g.game_cnt + ply-2].cap_p  ] )
+              add += 1;
+        }
+        *************/
+2. ---> function search
+    remove hung value from null_search 
+3. ---->
+    replace play.c with JA bug fixed (time control)
+
+//////////  3.1.0 ///////////

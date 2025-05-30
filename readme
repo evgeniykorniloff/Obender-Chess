@@ -1,0 +1,157 @@
+
+                      ***************************
+                      ***   Chess - OBender   ***
+                      ***************************  
+                      
+                      
+                      
+////////// this is very old simple chess engine //////////
+Моя старая программа детских времен для тестирования алгоритмов,
+(!!!не для спарринга с другими движками)
+обнаружил, что современный winboard
+не запускает ее, чуть подправил.
+modify:
+ 1. in play.c --> fixed reply on "xboard" lexem
+ 2. добавил поиск матов монте карло (он уже в зачаточном виде был)
+    и определение хороших взятий для LMR по Momentum 5
+   (check good captures with Momentum Material 5) 
+ 3. Ну и покоцал LMR - один легальный ход не сокращаюется,
+    в середине списка перемещений - сокращения на 1,
+    потом случайный остаток перемещений если нет скорости приращения -
+    сокращается на 2. Все это уточняется в функции основного поиска.
+    Лень париться. Движок перестал виснуть на глубине 10 -
+    пошел дальше ну и ладно.
+    Играет вообще нескучно. Насколько я играл в шахматишки, такого
+    интересного партнера комбинатора редко встретишь
+ 
+compile in linux:
+   gcc -O2 *.c -lm
+        in windows:
+   unkomment <windows.h> in utils.c
+   unkomment body of function prog_is_run
+      программа может терять без этой функции файл самообучения
+   install CodeBloks and make C - project
+    or
+   >> gcc -O2 *.c -lm
+run:
+  linux:
+    
+    >> sudo apt install xboard
+    >> unzip ./obender-3.2.4.x-25.zip
+    >> chmod +x ./obender
+    >> xboard -fcp ./obender &
+
+
+    
+/////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////
+
+
+
+
+
+                      *** ABOUT ***
+    
+ ver. 3.2.4.x  (update ver. 3.2.4)
+ buid 6, 9.05.09                    
+    
+
+ copyright(c) 2003-2009, by Nifont I
+ site:  http://serg-nifont.narod.ru
+ last modify:  xx.xx.2009
+ system:  Windows 
+ 
+ 
+ 
+ 
+ compiler:  VisualC++ EXpress, gcc.
+
+ 
+
+
+
+
+
+                   **** INSTALL ****
+
+1.  Download Winboard.
+
+You should download the distribution from the site of the author. This is free software. If you will not regret the time you get a lot of fun. It is a bit difficult for the first time, but you can use it for many of the chess engine and save a lot of time and money.
+
+    WinBoard site:    http://www.tim-mann.org
+ 
+2.  Install.
+
+The easiest way to start the program, specify the full path in the starting box. 
+You can create windows shortcut with command line:
+
+       winboard.exe   /cp /fcp  obender_3.2.4.x.exe
+
+
+The best way to go if you want to use a lot of chess engines, this is to edit the file winboard.ini. 
+It should be at the end add 2 lines. Quoting the name of executable file without an extension, further indicates the path to the directory:
+
+
+      "obender_3.2.4.x"    /fd=C:\Games\obender_dir
+      "obender_3.2.4.x"    /sd=C:\Games\obender_dir
+
+Please be careful! I did not immediately, though nothing complicated about it.
+
+  
+--------------------winboard.ini-----------------------------
+
+...
+
+/firstChessProgramNames={GNUChess
+"obender_3.2.4.x" /fd=C:\Games\obender_dir        <-- add line
+"GNUChes5 xboard"
+}
+/secondChessProgramNames={GNUChess
+"obender_3.2.4.x" /sd=C:\Games\obender_dir        <-- add line
+"GNUChes5 xboard"
+}
+-------------------------------------------------------   
+   
+
+
+
+
+
+ 
+                      ****  HELP *****
+open winboard.hlp ...
+
+You can play the simplest game directly from the console by typing movements manually. 
+List the most important commands:
+
+  new      -  new game
+  undo     - 
+  redo     -
+  st time  -  Time for movements in Seconds,  sample:  st 7
+  quit     -
+  go       - 	 Making your computer to make a movement
+  force    -  forced to introduce several movements unanswered PC
+
+  e2e4
+  e7e5
+  a7a8q   -  Examples of moves
+
+Full list of commands contained in the file winboard.hlp
+
+
+Warning! 
+  The program uses a file directory and file their debut sammobucheniya. Please do not touch these files! The work program is necessary to complete the command to all files of self was recorded correctly. In the case porchifayla self, you should delete it fruchnuyu. If you have other versions of the program, it is better not to use the file self from them. He can be inconsistent. With each new installation, the program loses 100-200 ELO from loss of self-file! 
+
+The most likely cause damage to the file can be self yavlyatsya abnormal two programs.
+
+                      
+
+
+	
+  Hope you will enjoy the game!
+       Thanks
+        
+
+
+
+ 

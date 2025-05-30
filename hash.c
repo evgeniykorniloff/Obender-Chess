@@ -3,12 +3,12 @@
 HashKey hashRnd[2][8][64];
 
 typedef struct{
-  HashKey key,key1;
+  HashKey key;
   int score,flag,depth;
   Move mv;
 }HItem;
 
-const int Hash_Size = (1<<20);
+const Hash_Size = (1<<19);
 
 
 HItem *hash[2];
@@ -31,7 +31,7 @@ void HashInit(void){
     for(c = WHITE; c <= BLACK; c++){
        hash[c] = malloc(sizeof(HItem)*Hash_Size);
        assert(hash[c] != NULL);
-       for(p = 0; p <8 ; p++)
+       for(p = PAWN; p <= KING; p++)
         for(sq = 0; sq < 64; sq++)
           hashRnd[c][p][sq] = Rand64();
 
@@ -47,9 +47,9 @@ void HashClear(void){
 int HashLook(int alpha,int beta, int depth, int *ret_score, Move *ret_mv){
    HItem *p = (HItem*)&hash[g.side][(int)g.key & (Hash_Size-1)];
 
-   if(p->key==g.key && p->key1==g.key1){
+   if(p->key==g.key){
       *ret_mv = p->mv;
-      if(p->depth >= depth && p->score>-INF+100  && p->score<INF-100)
+      if(p->depth >= depth)
         switch(p->flag){
           case ALPHA:
              if(p->score <= alpha){
@@ -90,15 +90,14 @@ void HashInsert(int alpha, int beta, int depth, Move mv){
   flag = alpha < beta ? EXACT : BETA;
  }else flag  = ALPHA;
 
- if(
-      p->flag == EMPTY  ||
-      p->flag*2 + p->depth <= flag*2 + depth
-   //  p->depth<=depth
+ if( //p->depth <= depth
+    p->flag == EMPTY  ||
+    p->flag*2 + p->depth <= flag*2 + depth
+   // (p->flag==EMPTY || p->depth <= depth || (p->flag == ALPHA && flag != ALPHA))
    ){
     p->score = alpha;
     p->depth = depth;
     p->key   = g.key;
-    p->key1   = g.key1;
     p->flag  = flag;
     p->mv = mv;
  }
@@ -108,10 +107,10 @@ void HashInsert(int alpha, int beta, int depth, Move mv){
 int HashDamp(void){
   int c,j,full=0;
 
-  for(c = WHITE; c <= BLACK; c++){
+  for(c = WHITE; c <= BLACK; c++)
    for(j = 0; j < Hash_Size; j++)
      if(hash[c][j].depth)
        full++;
-  }
-  return  full * 100 / (Hash_Size*2);
+
+   return  full * 100 / (Hash_Size*2);
 }

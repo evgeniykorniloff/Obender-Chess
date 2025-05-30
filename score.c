@@ -1,3 +1,4 @@
+#include <math.h>
 #include "chess.h"
 
 int value[7] = {0,VALUE_P,VALUE_N,VALUE_B,VALUE_R,VALUE_Q,VALUE_K};
@@ -7,10 +8,10 @@ extern int history[2][8][64];
 
 #define ROOK_BONUS   40
 #define KNIGHT_BONUS 50
-#define BISHOP_BONUS 60
+#define BISHOP_BONUS (60-10)
 #define QUEEN_BONUS  110
 
-const int add_st_value[7] = {0,0,KNIGHT_BONUS, BISHOP_BONUS,ROOK_BONUS, QUEEN_BONUS};
+const add_st_value[7] = {0,0,KNIGHT_BONUS, BISHOP_BONUS,ROOK_BONUS, QUEEN_BONUS};
 
 const int DOUBLE_PAWN = 6;
 const int ISOL_PAWN   = 12;
@@ -31,7 +32,7 @@ const int BAD_PAWN_ATK = 3;
 const int PIN = 8;
 const int XRAY = 6;
 const int HUNG[] = {0,10,3,3,5,10,20};
-const  int comp_value[] = {0,1,3,3,5,10,20};
+const  comp_value[] = {0,1,3,3,5,10,20};
 #define CNTRL_PAWN   (1<<15)
 #define CNTRL_KNIGHT (1<<14)
 #define CNTRL_BISHOP (1<<13)
@@ -71,8 +72,11 @@ int max(int v1, int v2) {  return v1 > v2 ? v1 : v2; }
 int min(int v1, int v2) {  return v1 < v2 ? v1 : v2; }
 
 
-
-//int abs(int v){  return v >= 0 ? v : (-v);}
+/*
+int abs(int v){
+  return v >= 0 ? v : (-v);
+}
+*/
 int Distance(int v1, int v2){
 
   return max(abs(ROW(v1)-ROW(v2)),
@@ -91,7 +95,7 @@ int Taxi(int sq0, int sq1)
   Степень фигурной угрозы противника (0..1)
 */
 double Stage(int c){
-   const int EMTL = 14 + 2*6 + 2*4 + 2*3;
+   const EMTL = 14 + 2*6 + 2*4 + 2*3;
     int c1 = c^1;
     int emtl = g.cnt[c1][QUEEN]*14 +
                g.cnt[c1][ROOK]*6 +
@@ -104,7 +108,7 @@ double Stage(int c){
 }
 
 double StageKnightBishop(int c){
-   const int EMTL =  2*4 + 2*3;   // 14
+   const EMTL =  2*4 + 2*3;   // 14
    int *v = g.cnt[c ^ 1],
         cnt  =  v[BISHOP] + v[KNIGHT],
         emtl = v[BISHOP]*4 +
@@ -122,7 +126,7 @@ double StageKnightBishop(int c){
 void InitEvaluate(void){
  void  GenScoreTable(int p, int tbl[64], int c, int max, int op_king_sq);
  int p,c,j;
-  const int blackPawnScore[64] =  // Jon Stanback pawn score
+  const blackPawnScore[64] =  // Jon Stanback pawn score
    { 0, 0, 0, 0, 0, 0, 0, 0,
      4, 4, 4, 0, 0, 4, 4, 4,
      6, 8, 2,10,10, 2, 8, 6,
@@ -133,7 +137,7 @@ void InitEvaluate(void){
      0, 0, 0, 0, 0, 0, 0, 0};
 
 
- const int MaxTableValue[] = {0,32,34,32,32,32,36};
+ const MaxTableValue[] = {0,32,34,32,32,32,36};
 
  for(c = WHITE; c <= BLACK; c++){
    for(p = PAWN; p <= KING; p++)
@@ -141,15 +145,15 @@ void InitEvaluate(void){
       g.kingSq[c^1]);
 
  }
-
+ 
  for(j = 0; j < 64; j++){
     score_table[BLACK][PAWN][j] =  blackPawnScore[j];
     score_table[WHITE][PAWN][j] =  blackPawnScore[63-j];
  }
-
+ 
 
  for(c = WHITE; c <= BLACK; c++){
-    const int king_file[] = {0,0,3,4,4,3,0,0};
+    const king_file[] = {0,0,3,4,4,3,0,0};
     double stage = Stage(c);
     int j;
 
@@ -164,47 +168,47 @@ void InitEvaluate(void){
     }
  }
 
- 
+ /*
+ do{
+    void PrintArray(FILE*f,int tbl[64], int p, int c);
+    FILE *f = fopen("sctable.txt","w");
+    int p,c;
+
+    for(c = WHITE; c <= BLACK; c++)
+     for(p = PAWN; p <= KING; p++)
+       PrintArray(f, score_table[c][p], p, c);
+
+    fclose(f);
+
+ }while(0);
+ */
 }
 
 int maxHungValue[2];
 int Evaluate(int alpha, int beta){
-  const int MARGIN = 500;
+  const MARGIN = 500;
 
   int s[2];
 
-  maxHungValue[WHITE] =  maxHungValue [BLACK] = 0;
-
+  maxHungValue[WHITE] = maxHungValue[BLACK] = 0;
+  
   s[WHITE] = g.mtl[WHITE];
   s[BLACK] = g.mtl[BLACK];
 
-  //Если нет пешек
-  if( (g.cnt[WHITE][PAWN]  | g.cnt[BLACK][PAWN])==0 )
-  {
-    //Если нечем ставить мат
-    if( (g.cnt[WHITE][QUEEN] | g.cnt[BLACK][QUEEN] | g.cnt[WHITE][ROOK ] | g.cnt[BLACK][ROOK])==0  &&
+  if( (g.cnt[WHITE][PAWN]  | g.cnt[BLACK][PAWN])==0  &&
+      (g.cnt[WHITE][QUEEN] | g.cnt[BLACK][QUEEN])==0 &&
+      (g.cnt[WHITE][ROOK ] | g.cnt[BLACK][ROOK])==0  &&
        g.cnt[WHITE][BISHOP] * 4   +   g.cnt[WHITE][KNIGHT] * 3   <  4+3 &&
        g.cnt[BLACK][BISHOP] * 4   +   g.cnt[BLACK][KNIGHT] * 3   <  4+3 )
-       s[WHITE]=0,s[BLACK]=0;
-    //если есть чем ставить мат
-    else{
-       if(s[WHITE]==VALUE_K)
-       {
-          //один белый король и у черных хватает материала для мата
-          if(g.cnt[BLACK][ROOK] | g.cnt[BLACK][QUEEN] | (g.cnt[BLACK][BISHOP]>1))
-             s[BLACK] += VALUE_Q*2;
-       }else if(s[BLACK]==VALUE_K){
-          //один черный король и у белых хватает материала для мата
-          if(g.cnt[WHITE][ROOK] | g.cnt[WHITE][QUEEN] | (g.cnt[WHITE][BISHOP]>1))
-             s[WHITE] += VALUE_Q*2;
-
-       }
-    }
-  }
+       return 0;
 
   if(s[g.side] - s[g.xside] + MARGIN <= alpha  ||
      s[g.side] - s[g.xside] - MARGIN >= beta)
      return s[g.side] - s[g.xside];
+
+ // s[0] = s[1] = 0;
+//  s[0] /= 10;
+//  s[1] /= 10;
 
   do{
     void GenerateAttackes(void);
@@ -227,9 +231,7 @@ int Evaluate(int alpha, int beta){
       stage = Stage(c);
       __stage = 1.0 - stage;
       for(i = g.start[c]; i <= g.stop[c]; i++)
-      {
-       if( (sq = g.list[i]) != -1 )
-       {
+       if( (sq = g.list[i]) != -1 ){
          int b0,b1;
 
          p = g.pos[sq];
@@ -259,17 +261,24 @@ int Evaluate(int alpha, int beta){
             //атакована и не защищена или
             //атакована меньшей частью
             if(b0==0  ||  ((~(comp_piece_cntrl[p] - 1)<<1)  &  b1) ){
+				/*
+              const ext_hung_bonus[] = 
+			  {
+				0,0,16,8,4,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+				//0,0,16,30,4,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+			  };
+				  */
 
               maxHungValue[c] = max(  maxHungValue[c], value[p] );
-
+              
               score -=  HUNG[p];
               ++hungCnt;
-              if(hungCnt==2) score -= 8;
+              if(hungCnt==2) score -= 10;
               else if(hungCnt>2) score -= 2;
-            }else if( p == PAWN && ((b0 & CNTRL_PAWN)==0) ){
+			//   score -= ext_hung_bonus[hungCnt];
+            }else if( p == PAWN && (b0 & CNTRL_PAWN==0) ){
                 if( (b1 & 15) > (b0 & 15) )
                   score -= 2; //слабая пешка зависла
-                else score -= 1;
             }
           }
 
@@ -294,7 +303,7 @@ int Evaluate(int alpha, int beta){
              if(g.pawn_column_cnt[c][x] > 1){
                 // ++doubleCnt;
                  score -= DOUBLE_PAWN;//-1+doubleCnt;
-             }
+             }    
 
              /*
                штраф за изолированную пешку в зависимости от
@@ -352,7 +361,7 @@ int Evaluate(int alpha, int beta){
                  }else{
                    if( sq==D7 || sq==E7 ) score -= 2;
                  }
-             }
+             }    
 
              /*
                Проходные пешки
@@ -383,7 +392,7 @@ int Evaluate(int alpha, int beta){
                if( (b_atk0[sq] & CNTRL_PAWN)  ||
                    (b_atk0[sq+dP] & CNTRL_PAWN) )
                    score += PASSED_PAWN_ROW[c][ROW(sq)]/2 + 2;
-              //end game
+              //end game     
               if(stage==0  &&  g.cnt[c1][KNIGHT]+g.cnt[c1][BISHOP]+g.cnt[c1][ROOK]==0)
               {
 
@@ -436,30 +445,34 @@ int Evaluate(int alpha, int beta){
                    }
                }
                if(p==ROOK){
-
+				 const int rook_tbl[] =
+				 {
+				   0,0,1,1,1,1,0,0
+				 };
+				 score += rook_tbl[COLUMN(sq)];
                  score += ROOK_BONUS;
                  score += Mobile_Pin_XRay(sq,p,c,b_atk0,b_atk1);
                  if(g.pawn_column_cnt[c][COLUMN(sq)]==0){
                     score += 2;  //open line
                     if(g.pawn_column_cnt[c^1][COLUMN(sq)]==0)
                       score += 2; //operation line
-                 }
+                 }   
                  if(c==WHITE){
                    if(ROW(sq)==7) score += 1;
-                   else if( ROW(sq)==1) score += 4;
+                   else if( ROW(sq)==1) score += 6;
                  }else{
                    if(ROW(sq)==0) score += 1;
-                   else if( ROW(sq)==6) score += 4;
+                   else if( ROW(sq)==6) score += 6;
                  }
                  if(b0 & CNTRL_ROOK) score += 2;
                  //активность и ценность ладьи возрастает с
                  //убыванием материала у противника
                 // score +=  ((14-Taxi(sq, g.kingSq[c1])) + 16 + 20)
                 //            * __stage;
-                 score += 10 * __stage;
+                 score += 10 * __stage;  
                  if( g.cnt[c][ROOK] > 1 ) score += 4;
-
-
+                 
+                 
                }else if(p==BISHOP){
 
                  score += BISHOP_BONUS;
@@ -470,24 +483,24 @@ int Evaluate(int alpha, int beta){
                }else if(p==QUEEN){
                  int cnt;
                  score += QUEEN_BONUS;
-
+                 
                  score += Mobile_Pin_XRay(sq,p,c,b_atk0,b_atk1);
                  if(b0 & CNTRL_ROOK) score += 1;
                  if(b_atk0[sq] & CNTRL_BISHOP) score += 1;
                  if(Distance(sq, g.kingSq[c]) > 2)  score -= 2;
-
-               //  score += (14 - Taxi(sq,g.kingSq[c1])) *
+                 
+                // score += (14 - Taxi(sq,g.kingSq[c1]))>>1;
                 // (0.5 + StageKnightBishop(c) * 0.7);
                 // ;
                  if(Distance(sq, g.kingSq[c1]) <= 3){
                     score += 5;//10*(0.5 + (1.0-StageKnightBishop(c)) * 0.7);
                  }
-
-                 //score += 14 - Taxi(sq, g.kingSq[c1]);
+                 
+                 score += (14 - Taxi(sq, g.kingSq[c1]))/2;
                  cnt = g.cnt[c][ROOK] + g.cnt[c][BISHOP] + g.cnt[c][KNIGHT];
                  if( cnt > 0 ){
                    score += 2;
-                   if( cnt > 1 ) score += 4;
+                   if( cnt > 1 ) score += 4; 
                  }
                }else if(p==KNIGHT){
                   score += KNIGHT_BONUS;
@@ -498,13 +511,13 @@ int Evaluate(int alpha, int beta){
                }
            }
        }//end if sq != -1
-      }
+
        //ценность пешек возрастает
        score += (g.cnt[c][PAWN]) * __stage;
        if(g.cnt[c][PAWN]==0) score -= 16;
        s[c] += score;
        //s[c] += st_score/8;
-     }//for c
+     }//for c				 
 
 
   }while(0);
@@ -635,7 +648,7 @@ void GenerateAttackes(void){
                bit_atk[u] = ++bit_atk[u] | cntrl;
              }
           }else if(SWEEP(p)){//other pieces
-             extern int atk[16*16];//,dir_atk[16*16];
+             extern int atk[16*16],dir_atk[16*16];
              extern const int center;
 
              for(j = d_start[p]; j <= d_stop[p]; j++){
@@ -678,7 +691,7 @@ int KingSFTY(int c){
    int sq = g.kingSq[c], c1 = c^1, cntCheck, n0 = MAP(sq),
        *a1 = p_attack[c1].bit_atk, *a0 = p_attack[c].bit_atk,
        dP = c==WHITE? -8:8, n1,d,u,j,score=0,cntMoveKing,
-       cntPawnScreen,findPawn,
+       fine,cntPawnScreen,findPawn,
        *hasOpponent = g.cnt[c1],
        *pDir,*pStop;
        
@@ -690,57 +703,57 @@ int KingSFTY(int c){
    /*
       сколько легальных ходов короля
       (кол-во смежных свободных неатакованных клеток)
-
+      
       +
         кол-во атак в клетки, смежные с королем
    */
   cntMoveKing = 0;
   findPawn = 0;
   cntPawnScreen = 0;
-
+  
   pDir =  (int*)&dir[d_start[KING]];
-  pStop = pDir + 8;
-  do{
+  pStop = pDir + 8; 
+  do{  
      n1 = n0+(*pDir);
      if( (n1&0x88) == 0 ){
       int cntAtk;
       u = UNMAP(n1);
-
+      
       cntAtk = a1[u] & 15;
       if( cntAtk ) score -= cntAtk;
       else if(g.pos[u]==0) cntMoveKing++;
       if(g.pos[u] == PAWN && g.color[u] == c)
       {
-        const int pscr[] = {4,6,2,0,0,2,6,4};
-
+        const pscr[] = {4,6,2,0,0,2,6,4};
+              
         findPawn = 1;
-
+        
         if(c == WHITE){
           if(ROW(u) <  ROW(sq))
           {
              cntPawnScreen++;
-             score += pscr[COLUMN(u)];
+             score += pscr[COLUMN(u)];                
           }
         }else{
           if(ROW(u) > ROW(sq))
           {
              cntPawnScreen++;
-             score += pscr[COLUMN(u)];
+             score += pscr[COLUMN(u)];                
           }
         }
       }// pos[u]==PAWN
-
-
+      
+      
      }// n1 & 0x88
      pDir++;
   }while(   pDir <= pStop  );
-
+  
   if(!findPawn) score -= 4;
   if(cntPawnScreen==0) score -= 8;
   if(g.pawn_column_cnt[c][COLUMN(sq)]==0) score -= 4;
 
-
-
+  
+  
 
    /*
       Подсчитаем количество  клеток, с которых
@@ -751,9 +764,9 @@ int KingSFTY(int c){
 
  if(hasOpponent[PAWN])
   if( (unsigned)(sq + dP) < 64 )
-  {
+  { 
    //если квадрат перед королем атакован пешкой  :))
-   //неприятеля, то она может обьявить шах следующим ходом!
+   //неприятеля, то она может обьявить шах следующим ходом!  
    if(  a1[ sq + dP]  & CNTRL_PAWN )
    {
      if( COLUMN(sq) > 0 )
@@ -762,33 +775,33 @@ int KingSFTY(int c){
         if( g.color[u] == NEUTRAL  &&
             g.color[u + dP] == c1  &&
             g.pos[u + dP]   == PAWN ) cntCheck++;
-     }
+     }   
      if( COLUMN(sq) < 7 )
      {
         u = sq + dP + 1;
         if( g.color[u] == NEUTRAL  &&
             g.color[u + dP] == c1  &&
             g.pos[u + dP]   == PAWN ) cntCheck++;
-     }
+     }   
    }
-
+   
    //пешка атакует короля - взятие с шахом!
    if( COLUMN(sq) > 0 )
    {
      u = sq + dP - 1;
      if( a1[u] & CNTRL_PAWN )
-       if( g.color[u] == c ) cntCheck++;
-
+       if( g.color[u] == c ) cntCheck++;     
+   
    }
    if(COLUMN(sq) < 7 )
    {
      u = sq + dP + 1;
      if( a1[u] & CNTRL_PAWN )
-       if( g.color[u] == c ) cntCheck++;
-
+       if( g.color[u] == c ) cntCheck++;     
+   
    }
-  }
-
+  }  
+   
 
    if(hasOpponent[BISHOP] | hasOpponent[QUEEN])
     for(j = d_start[BISHOP]; j <= d_stop[BISHOP]; j++){
@@ -836,19 +849,22 @@ int KingSFTY(int c){
    score -= min(cntCheck*fine, 32);
 */
    switch(cntMoveKing){
-     case 0:
-       score -= 4;
+     case 0: 
+       score -= 4; 
        if(cntCheck) score -= 8;
        break;
-     case 1:
-       score -= 2;
+     case 1: 
+       score -= 2; 
        break;
-     case 2:
-       score -= 1;
+     case 2: 
+       score -= 1; 
        break;
    }
-   score -= min(cntCheck*4, 32);
+  // score -= min(cntCheck*4, 32);
 
+  score -= sin( (3.14/2/6) * min(cntCheck,6)) * 64 
+	            +
+			  cntCheck;
 
 
 
@@ -856,7 +872,7 @@ int KingSFTY(int c){
    if(g.cnt[c1][QUEEN] && !g.casling[c]){
      int LeftCastlEnable( int c );
      int RightCastlEnable( int c );
-
+                                        
      int l = LeftCastlEnable(c);
      int r = RightCastlEnable(c);
      if(l==0) score -= 2;
@@ -867,8 +883,8 @@ int KingSFTY(int c){
      if( COLUMN(sq) > 4 ) // o-o
          score += 8*stage;
      else                 // o-o-o
-         score += 6*stage;
-   }
+         score += 6*stage;             
+   }   
    return (stage*score);
 }
 
@@ -899,8 +915,9 @@ int  Mobile_Pin_XRay(int sq, int p, int c, int* a0, int* a1){
                      a1[u]==0){
 
                      if(g.color[sq1]==c){
-                        score += XRAY;
-                        if(g.pos[u]==KING) score += 2;
+                        //score += XRAY;
+                        if(g.pos[u]==KING)// score += 2;
+						  score += XRAY;
                      }else{
                         score += PIN;
                         if(g.pos[u]==KING){
@@ -919,7 +936,18 @@ int  Mobile_Pin_XRay(int sq, int p, int c, int* a0, int* a1){
 
 
    if(mobile==0) score -= 3;
-   //if(p==QUEEN) return score + mobile/6;
-   //else
-   return score + mobile/3;
+   else{
+	 if(p==BISHOP)
+	 {
+	    mobile = sin((3.14/2/15)*mobile) * 14;
+	 }else if(p==ROOK){
+		mobile = sin((3.14/2/16)*mobile) * 14;
+
+	 }else{//queen
+		mobile = sin((3.14/2/31)*mobile) * 14;
+	 }
+
+   }
+ 
+   return score + mobile;
 }

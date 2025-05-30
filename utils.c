@@ -1,3 +1,5 @@
+// #include <windows.h>
+
 #include "chess.h"
 extern int Search_Only_Mtl;
 
@@ -178,15 +180,13 @@ int StrToMove(char *s, Move *ret_mv){
            if(mv & PROMOTE){
               int new_p = QUEEN;
               if(len > 4)
-              {
                 switch(tolower(s[4])){
                   case 'q':   new_p = QUEEN; break;
                   case 'n':   new_p = KNIGHT; break;
                   case 'b':   new_p = BISHOP; break;
                   case 'r':   new_p = ROOK; break;
                 }
-              }
-              mv = (mv & ~(7<<12)) | (new_p << 12);
+                mv = (mv & ~(7<<12)) | (new_p << 12);
             }
            *ret_mv = mv;
            return 1;
@@ -270,17 +270,39 @@ char* U64ToStr(char *str, U64 v){
 // 9 ply, score=1.56, time = 10.84 seconds, nodes=48000, PV = "Nf3 Nc6 Nc3 Nf6"
 void PrintSearchStatus(int ply, int score, int time, U64 nodes, Move *pv){
   char str_nodes[128], str_move[64], output[1024];
- // int kf = VALUE_P / 100,
   int    j;
-//  if(kf == 0) kf = 1;
+  extern int search_move2;
+  //extern int Fixed_Depth();
+  //extern int s_depth;
 
-  sprintf(output, "%2d %4d %4d %10s ",ply, score/10 + score%10 /*+ score%VALUE_P*/, time, U64ToStr(str_nodes,nodes));
+  sprintf(output, "%2d %4d %4d %10s ",
+	      ply,
+	      score/10 + score%10 /*+ score%VALUE_P*/, time, U64ToStr(str_nodes,nodes));
   for(j = 0; j < 14 && pv[j]; j++) {
     strcat(output, MoveToStr(pv[j],str_move));
     strcat(output," ");
+    if(j==0) search_move2 = pv[j];
   }
 
   printf("%s\n", output);
+  fflush(stdout);
 }
 
 
+  int prog_is_run(void){
+/***   
+    HWND MemHnd;
+    int flag;
+    // file in memory
+    MemHnd = CreateFileMapping((HWND)0xFFFFFFFF,
+       0, PAGE_READWRITE, 0, 1024, "dummy");
+    flag = GetLastError() == ERROR_ALREADY_EXISTS;
+    
+ 
+   // CloseHandle(MemHnd);
+    return flag;
+    ***/
+    return 0;
+  }
+  
+  

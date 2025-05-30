@@ -4,11 +4,11 @@ int ply;
 const int dP[2]      = {  -8, 8},
 prom_row[2]          = {  0, 7},
 first_pawn_row[2]    = {  6, 1},
-d_start[7]           = {  6, 4, 8,  4, 0, 0, 0},
+d_start[7]           = {  6, 4, 8,  4, 0, 0, 0}, 
 d_stop [7]           = {  7, 5, 15, 7, 3, 7, 7},
  dir [16] =
 {
-  1, 0x10, -1, -0x10, 0x0F, 0x11, -0x0F, -0x11,
+  1, 0x10, -1, -0x10, 0x0F, 0x11, -0x0F, -0x11, 
   0x0E, -0x0E, 0x12, -0x12, 0x1F, -0x1F, 0x21, -0x21
 };
 
@@ -17,6 +17,9 @@ struct Game_Type g;
 int treeCnt[MAX_PLY];
 Move tree[MAX_PLY * 100];
 int sort_val[MAX_PLY * 100];
+int mtl_path[2][MAX_GAME+MAX_PLY];
+
+
 
 extern U64 cnt_nodes;
 int __foo;
@@ -306,8 +309,7 @@ void InsertPiece( int p, int c, int sq, int i )
 {
 
   assert( g.pos[sq] == 0 && g.index[sq] == -1 && g.list[i] == -1 );
-  if(c==WHITE) g.st_score[WHITE] += 63-sq;
-  else g.st_score[BLACK] += sq; //0x002
+
   g.pos[sq] = p;
   g.color[sq] = c;
   g.index[sq] = i;
@@ -324,7 +326,7 @@ void InsertPiece( int p, int c, int sq, int i )
   else if ( p == KING ) g.kingSq[c] = sq;
 
   g.key ^= hashRnd[c] [p] [sq];
-   g.key1 ^= hashRnd[c] [7-p] [sq];
+
 }
 
 
@@ -332,9 +334,6 @@ void RemovePiece( int p, int c, int sq, int i )
 {
 
   assert( g.pos[sq] == p && g.color[sq] == c && g.index[sq] == i && g.list[i] == sq );
-
-  if(c==WHITE) g.st_score[WHITE] -= 63-sq;
-  else g.st_score[BLACK] -= sq; //0x002
 
   g.pos[sq] = NOPIECE;
   g.color[sq] = NEUTRAL;
@@ -351,7 +350,7 @@ void RemovePiece( int p, int c, int sq, int i )
   }
 
   g.key ^= hashRnd[c] [p] [sq];
- g.key1 ^= hashRnd[c] [7-p] [sq];
+
 }
 
 
@@ -450,14 +449,18 @@ void MakeMove( Move mv )
 
 
   }
-  else
+  else{
     g.key ^= hashRnd[g.side] [PAWN] [0];
+  }
+  //0x001
+  mtl_path[g.side][g.game_cnt+ply] = MTL(g.side);
+  mtl_path[g.xside][g.game_cnt+ply] = MTL(g.xside);
+
   g.game_list[cnt] = mv;
   g.key_list[cnt] = g.key;
-  g.white_mtl_list[cnt] = g.mtl[WHITE] - g.mtl[BLACK]; //0x001
-  g.white_st_score_list[cnt] = g.st_score[WHITE] - g.st_score[BLACK]; //0x002
   g.side ^= 1; g.xside ^= 1;
   ply++;
+  
 }
 
 void UnMakeMove( Move mv )

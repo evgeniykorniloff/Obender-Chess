@@ -71,8 +71,8 @@ typedef U64 HashKey;
 
 #define SWEEP(p)   ((1<<(p)) &  ((1<<ROOK)|(1<<QUEEN)|(1<<BISHOP)))
 
-//#define SWAP(a,b) (((a) == (b)) || (((a) ^= (b)), ((b) ^= (a)), ((a) ^= (b))))
-#define SWAP(a,b) {int tmp = a; a = b; b = tmp;}
+#define SWAP(a,b) (((a) == (b)) || (((a) ^= (b)), ((b) ^= (a)), ((a) ^= (b))))
+
 typedef struct {
   int cap_sq,cap_p, cap_p_i, castl_enable;
 } Tag_Move;
@@ -81,18 +81,16 @@ typedef struct {
 
 struct Game_Type{
   int pos[64],color[64],index[64],list[32],start[2],stop[2],
-      cnt[2][8], mtl[2], st_score[2],  pawn_column_cnt[2][8],
+      cnt[2][8], mtl[2],  pawn_column_cnt[2][8],
       pawn_row_cnt[2][8],castl_enable,side,xside,
       casling[2],
       kingSq[2],__en_pass_sq;
-  HashKey key,key1;
+  HashKey key;
 
   int game_cnt,game_max;
   Move game_list[MAX_GAME + MAX_PLY];
   HashKey key_list[MAX_GAME + MAX_PLY];
   Tag_Move tag_list[MAX_GAME + MAX_PLY];
-  int white_mtl_list[MAX_GAME + MAX_PLY];
-  int white_st_score_list[MAX_GAME + MAX_PLY];
   int isLearn;
 };
 
@@ -166,6 +164,10 @@ void SavePvLine( Line dest, Line source, Move mv );
 void TimeReset( void );
 void HistoryInit( void );
 void InitEvaluate( void );
+//0x001
+#define MTL(c)  (g.mtl[c] - g.mtl[c^1])
+#define ROOT_MTL(c)  (root_mtl[c] - root_mtl[c^1])
+extern int mtl_path[2][MAX_GAME+MAX_PLY];
 ///////////////////////////////////
 #endif
 

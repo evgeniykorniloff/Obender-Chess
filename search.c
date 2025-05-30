@@ -1,23 +1,18 @@
 #include "chess.h"
 #include "pvtree.h"
-#include "time.h"
-#include "stdlib.h"
-//#define DEBUG
 
-/* typedef Move Line[MAX_PLY]; enum{ EMPTY,ALPHA,EXACT,BETA }; typedef struct{ int score,flag,depth; Line line; }CS;
-typedef struct{ CS s[2]; Move mv; }Root_Score; */
-int Check( void );
+
+int root_side;
 extern int __foo;
-int root_white_mtl;
-int root_white_st_score;
 Root_Score root_list[400];
 int Use_Null = 1, Null_Margin = 0, Null_Min_Depth = 4;
-int s_depth, doNull,doReduction;
-int history[2] [8] [64], mate_history[2] [8] [64];
-int histMaxVal[2];
-int histCutVal[2];
-const int MAX_HIST = 1000000;
-const int MIN_HIST = 1000;
+int s_depth, doNull,doReduction,root_side;
+int //hist_from[2][8][64],
+    hist_to[2][8][64],hist_mate[2][8][64];//,hist[2][8][64][64];
+//int histMaxVal[2];
+//int histCutVal[2];
+const MAX_HIST = (1 << 14)-1;   //1000000;
+const MIN_HIST = 1000;
 int root_mtl[2];
 
 extern time_t start_time, curr_time, limit_time;
@@ -32,7 +27,7 @@ typedef struct
   Move hash_mv, pv_mv, kill_mv, pvkill_pv;
   int cut,cutCnt;
   PVNode *list_pv;
-  int cntBestKillers;
+  int cntBestKillers; 
 
 }
 PhaseInfo;
@@ -50,14 +45,16 @@ Line pv_line, killer, pv_killer;
 
 #define PV (vtr.moveFromTree && legalCnt <= 3)
 #define MAIN_PV (vtr.moveFromTree && legalCnt ==1 && alpha==-INF && beta==INF)
-
-#define MTL(c)  (g.mtl[c] - g.mtl[c^1])
-#define ROOT_MTL(c)  (root_mtl[c] - root_mtl[c^1])
-
 //0x001
-static int __cntFindNodeInLearnTbl;
+int sma5( int c, int N){
+  int *v = &mtl_path[c][0];
+  return ( v[N] + v[N-1] + v[N-2] + v[N-3] + v[N-4] ) / 5;
+}
+
+int cut[] = {0,1,2,3,7,12,40,70};
+
 int Search( int alpha, int beta, int depth, int check,
-            Line ret_pv_line, int lazy , int isTree, int useNull)
+            Line ret_pv_line, int lazy , int isTree, int useNull, int call_cnt)
 {
   int Quies( int alpha, int beta );
   int StopSearch( void );
@@ -78,12 +75,40 @@ int Search( int alpha, int beta, int depth, int check,
   PhaseInfo vtr;
   Line tmp_line;
   int c0 = g.side, c1 = c0 ^ 1;
-  //int old_alpha = alpha;
+  int old_alpha = alpha;
   int L_MTL = MTL(c0);
+  int oneReply = 0;
+              
+  int genN = rand()%56;
+  //??
+  //if(depth>32)
+//    printf("----->\n");
+
+  if(ply > 0)
+  {
+   if(check){
+    int LegalMoveList(void);
+    if ( LegalMoveList() == 0 ) return INF - ply; //CAP. OP. KING
+    else if ( treeCnt[ply + 1] == treeCnt[ply] ) return -INF + ply + 1; // mate
+    else if ( treeCnt[ply + 1] == treeCnt[ply] + 1 ) oneReply = 1;
+   }
+  }
+
+ // call_cnt = ply;
+  call_cnt = call_cnt+1;
+  //if(call_cnt > 3) call_cnt = 1;
+	            //max(call_cnt+1,3);
+ // if(call_cnt > 6) call_cnt = 6;		 
+
+ //  if(!check && ply > s_depth*3 && depth > 2)
+ //	  depth = 2;
+
+ if(  -INF + ply + 1 >= beta   &&  ply > 0 ) 
+      return beta; // function  up
 
   if( check ){
     if(depth <= 0) depth = 1;
-
+    
   }else if( ply > s_depth * 3 )
     depth = 0;
 
@@ -93,97 +118,61 @@ int Search( int alpha, int beta, int depth, int check,
   if ( depth <= 0 ) return Quies( alpha, beta );
   else if ( StopSearch() ) return 0;
   else if ( ply > MAX_PLY - 4 ) return Evaluate( alpha, beta );
-  else if ( ply > 0 && Repetition() ) return 0;
-  else if ( ply > 4 && s_depth>6 /*&& !doNull*/ && LearnLook( depth, alpha, beta, & score ) ){
-      __cntFindNodeInLearnTbl++;
-      return score;
-  }
-  else if ( HashLook( alpha, beta, depth, & score, &vtr.hash_mv ) &&
-            !check
-          ) 
-      return score;
+  else if ( ply > 0 && Repetition() ){
+	  if(g.side==root_side)
+		  return -8;
+	  return 0;					  
+  } else if ( ply > 3 &&  LearnLook( depth, alpha, beta, & score ) ) return score;
+  else if ( HashLook( alpha, beta, depth, & score, & vtr.hash_mv ) ) return score;
   else
   {
-    int legalCnt = 0;
+   int legalCnt = 0;
     int cntGoodMoves;
     Move last = LastMove();
     int mateThreat = 0;
-    int oneReply = 0;
+    //int oneReply = 0;
 
-    //STATIC SEARCH  AND  NULL CUT //0x001
-    if(depth <= 2  && ply > 0 && ( doNull | check)== 0  && (last&PROMOTE)==0)
-    {
+	 if(  Use_Null && !lazy && !check && ply > 0 //Null_Min_Depth //&&
+          )
+       do{
+        int saveDoNull = doNull,tmp;
 
-       //if( Evaluate(beta-1,beta) >= beta)
-       if((g.mtl[g.side] - g.mtl[g.xside]) - (VALUE_N-500) > beta)
-          return beta;
-    }
-
-
-    if(  Use_Null && !lazy && !check && ply > Null_Min_Depth)
-    do{
-      int saveDoNull = doNull,tmp;
-       
-      //good capture in momentum ? not null move :))  0x001
-      
-      if(depth > 2  && (last & (CAPTURE|PROMOTE)) )
-        //if((last&CAPTURE) && (g.tag_list[ply-1].cap_p==PAWN||(last&PROMOTE))) //слабая пешка или превращение
-
-      {
-        const int N = 5;// 11;
-        int good_cap = 0;
-        int P = g.game_cnt + ply;
-        int mtl = g.mtl[WHITE] - g.mtl[BLACK];
-
-         //??
-         //   printf("--->\n"); 
-
-        if(g.xside==WHITE)
-        {
-            if(P-N <= 0)
-               good_cap = mtl > root_white_mtl && abs(mtl) < VALUE_R;
-            else
-               good_cap = mtl > g.white_mtl_list[P-N] && abs(mtl) < VALUE_Q;
-        }else{
-            if(P-N <= 0)
-               good_cap = mtl < root_white_mtl && abs(mtl) < VALUE_R;
-            else
-               good_cap = mtl < g.white_mtl_list[P-N] && abs(mtl) < VALUE_Q;
-        }
-
-      //  if(good_cap && (g.mtl[g.side] - g.mtl[g.xside]) - 2*VALUE_P > beta)
-      //    good_cap = 0;
-        if(good_cap){
-         // printf("#----> iid\n");
-          break;
-        }
-      }
-       
-
+		/* 
+		if(depth > 3)
+		  if(Evaluate(beta+499, beta+501) <
+		    	beta+500) break;   // NO NULL MOVE
+		  */
+       if(depth > 3)
+		  if(Evaluate(beta-500-1, beta-500) <
+		    	beta-500) break;   // NO NULL MOVE
+	 	 
 
         doNull = 1;
         treeCnt[ply + 1] = treeCnt[ply];
         MakeMove( 0 );
         tmp_line[ply] = 0;
-        tmp = -Search( -(beta), -(beta-1), depth-3, 0, tmp_line, 1, 0, 0 );
+        tmp = -Search( -(beta), -(beta-1),  depth-3, 0, tmp_line, 1, 0, 0,call_cnt );
         UnMakeMove( 0 );
         doNull = saveDoNull;
         if(tmp >= beta) return beta;
-       if(tmp < beta  &&  beta > -INF+100 && tmp < -INF+100)
+        if(  tmp < -INF+100 && beta > -INF+100)
           mateThreat = 1;
+        
+    }while(0);
 
-}while(0);
-
+skipNull:
 
 if(ply > 0)
 {
-
+ /*
  if(check){
     int LegalMoveList(void);
     if ( LegalMoveList() == 0 ) return INF - ply; //CAP. OP. KING
     else if ( treeCnt[ply + 1] == treeCnt[ply] ) return -INF + ply + 1; // mate
     else if ( treeCnt[ply + 1] == treeCnt[ply] + 1 ) oneReply = 1;
- }else{
+ }else
+	*/
+ {
 
     if ( Generate() == 0 ) return INF - ply; //CAP. OP. KING
     else if ( treeCnt[ply + 1] == treeCnt[ply] ) return 0; // ?? not realy
@@ -197,7 +186,8 @@ if(ply > 0)
     while ( NextMove( & vtr, & mv ) )
     {
       int nextCheck = 0, nextDepth = depth - 1, cutt_off = 0;
-      int add = 0, threat = 0,nextUseNull, prob_score;
+      int add = 0, threat = 0, good_cap=0, good_move=0,
+      no_cap_mv_cnt=0;
 
       if ( ( mv & ( LEFT_CASTL | RIGHT_CASTL ) ) && !LegalCastl( mv ) )
         continue;
@@ -212,13 +202,9 @@ if(ply > 0)
 
       nextCheck = Check();
 
-
-      //extension in search
-      if ( (ply > 2 || (nextCheck && nextDepth==0))
-             &&
-           (ply < 20 || ply< (s_depth<<1) || (nextCheck && nextDepth==0)) )
+    //  if ( ply > 2 )
       {
-      //////////////ext
+
         if ( nextCheck ){
            add += 1;
            threat = 1;
@@ -228,178 +214,106 @@ if(ply > 0)
            add += 1;
            threat = 1;
         }
-
+   
+		 
         if(mateThreat ){
 
            add += 1;
-           threat = 1;
+           //threat = 1;
         }
+		  
+		
         if(oneReply ){
 
             add += 1;
         }
-        ////// 0x001
-      //recaprure  in momentum ?  :))
-      if(s_depth > 4  && (mv & (CAPTURE|PROMOTE)) && add==0 && ply>2 && ply<s_depth)
-      {
-
-        const int N = 5,N1=2;
-        int good_recap = 0;
-        int P = g.game_cnt + ply;
-        int mtl = g.mtl[WHITE] - g.mtl[BLACK];
-
-        if(P-N>0 && mtl == g.white_mtl_list[P-N])good_recap=1;
-        else if(P-N1>0 && mtl == g.white_mtl_list[P-N1])good_recap=1;
-        if(good_recap){
-           add += 1;
-            //printf("# -----> iid \n");
-
-        }
-       /*************
-        const int N = 5;// 11;
-        int good_recap = 0;
-        int P = g.game_cnt + ply;
-        int mtl = g.mtl[WHITE] - g.mtl[BLACK];
-        if(P-N <= 0){
-          good_recap = mtl==root_white_mtl && abs(mtl) < VALUE_R;;
-        }else{
-            good_recap = mtl == g.white_mtl_list[P-N] && abs(mtl) < VALUE_Q;
-        }
-        if(good_recap &&
-          (g.mtl[g.xside] - g.mtl[g.side])  //side is change in makemove
-             + 2*VALUE_P < alpha)
-          good_recap = 0;
-        if(good_recap){
-           add += 1;
-            //printf("# -----> iid \n");
-
-        }
-        *********/
-      }
-
-
-
-        ///////
-
-
-
+ 
         if(add > 1) add = 1;
         nextDepth  = nextDepth + add;
-
-
-        if(add == 0 && check && !doNull && depth <= 2 && ply<(s_depth<<1))
-        {
-           if( oneReply ) nextDepth += 1;
-           else if( treeCnt[ply+1] - treeCnt[ply] == 2 ) ;
-           else {
-              nextDepth--;
-              if(nextCheck && nextDepth<=0) nextDepth++;
-           }
-        }
-
-        ///////////ext
-       }
-  if(nextCheck && nextDepth<=0) nextDepth++;
-  nextUseNull = 1;//legalCnt > 3 || nextDepth<=2;
-  if(MAIN_PV || nextDepth <= 0){// || legalCnt<=3){
-
-       tmp_line[ply] = 0;
-       score = -Search( -beta, -alpha, nextDepth, nextCheck, tmp_line,0, vtr.moveFromTree,
-         nextUseNull);
-      // printf("#----->deb\n");
-
-  }else{
-    int iid_enable = //0;  //0x002
-
-                      ply > 4    &&
-                      //!doNull  &&
-                      Use_Null &&
-                      s_depth > 6  &&
-                      depth > 2    &&
-                      legalCnt > 3 &&
-                      nextDepth<depth &&
-                      (mv&(CAPTURE|PROMOTE))==0 &&
-                      (g.mtl[g.xside] - g.mtl[g.side]) + VALUE_P/2 < alpha;
-
-             
-      //good simple move in momentum ?  :))  0x002
-      if(iid_enable)
-      {
-        const int N = 6;// 11;
-        int good_move = 0;
-        int P = g.game_cnt + ply;
-        int st_score = g.st_score[WHITE] - g.st_score[BLACK];
-
-        if(g.xside==WHITE)
-        {
-            if(P-N <= 0)
-               good_move = st_score > root_white_st_score;
-            else
-               good_move = st_score > g.white_st_score_list[P-N];
-        }else{
-            if(P-N <= 0)
-               good_move = st_score < root_white_st_score;
-            else
-               good_move = st_score < g.white_st_score_list[P-N];
-        }
-        if(good_move)
-        {
-           iid_enable=0;
-        }
-
-      }
-
-
+        
      
-    // if(ply<=4)iid_enable=1;
-
-
-     if( iid_enable )
-     {
-       int save = doReduction;
-       doReduction = 1;
-    //??
-    //printf("# -----> iid \n");
-       tmp_line[ply] = 0;
-       prob_score = -Search( -(alpha+1), -alpha, nextDepth-1, nextCheck, tmp_line,0, vtr.moveFromTree,
-                    nextUseNull || nextDepth-1<=2);
-       doReduction = save;
-
-       if(prob_score <= alpha){
-          score = alpha;
-          //if(ply>4)
-          goto skipSearch;
+        
        }
+    //0x001
+      //if(1){
+      do{
+       int N = g.game_cnt + ply - 1;
+       good_cap = good_move=0;
+       if(N>5)
+        if(mtl_path[c0][N] > mtl_path[c0][N-5])
+        {
+          if(mv &(CAPTURE|PROMOTE))
+              good_cap=1;
+          good_move = 1;
+        } 
+      }while(0);       
+      if((mv &(CAPTURE|PROMOTE))==0)
+       if(!threat)
+        no_cap_mv_cnt++;
 
+  if(legalCnt <= 1 || threat || nextDepth <= 0)
+ //if(vtr.moveFromTree || /*legalCnt==1 ||*/ nextDepth <= 0) 
+  {
 
-     }else{
-        if(legalCnt <= 3) prob_score = alpha + 1;
-        else prob_score = alpha;
-     }
-
-     if( prob_score > alpha ){
+							   
        tmp_line[ply] = 0;
-       score = -Search( -beta, -alpha, nextDepth, nextCheck, tmp_line,0,vtr.moveFromTree,
-                       nextUseNull );
-     }else{
+       score = -Search( -beta, -alpha, nextDepth, nextCheck, tmp_line,0,
+		                vtr.moveFromTree, legalCnt > 3,call_cnt );
+
+  }else{//0x001
+	 int save = doReduction;  
+	 
+	 int R = 1;//ply>2?1:0;
+  if(ply<=2) R = 0;
+  else
+  {	 
+     if(depth > 2 &&
+        (legalCnt>genN)  &&       //случайный раздел хорошие - плохие ходы
+        (!good_move)     &&       //нет момента 5го - скорость не положительна
+        ((mv &(CAPTURE|PROMOTE))==0) //нет момента 1го
+       )
+        R = 2;  //это очень много, надо бы на 1 сокращать, да 
+                //программа несерьезная
+   }  
+     doReduction = R; 
+     tmp_line[ply] = 0;
+     score = -Search( -(alpha+1), -alpha, nextDepth-R, nextCheck, tmp_line,0,vtr.moveFromTree,legalCnt > 3,call_cnt );
+     if(R==2 && score>alpha){
+         R-=1;
+         doReduction = R; 
+         tmp_line[ply] = 0;
+         score = -Search( -(alpha+1), -alpha, nextDepth-R, nextCheck, tmp_line,0,vtr.moveFromTree,legalCnt > 3,call_cnt );
+     }     
+  //  R++;
+  //  do{
+  //           R--;
+  //	     doReduction = R; 
+  //	     tmp_line[ply] = 0;
+  //	     score = -Search( -(alpha+1), -alpha, 
+  //	                      nextDepth-R, nextCheck, tmp_line,0,vtr.moveFromTree,legalCnt > 3,call_cnt );
+  //  }while(score>alpha && R > 0);
+     
+    // if(score > alpha && R==2 && nextDepth-1>0){
+    //   tmp_line[ply] = 0;
+    //   score = -Search( -(alpha+1), -alpha, nextDepth-1, nextCheck, tmp_line,0,vtr.moveFromTree,legalCnt > 3,call_cnt );
+    // }
+     
+     doReduction = save;
+
+     if(score > alpha ){
         tmp_line[ply] = 0;
-        score = -Search( -(alpha+1), -alpha, nextDepth, nextCheck, tmp_line,0,vtr.moveFromTree,
-                        nextUseNull);
-        if(score > alpha && score < beta){// || legalCnt <= cntGoodMoves){
-          tmp_line[ply] = 0;
-         score = -Search( -beta, -alpha, nextDepth, nextCheck, tmp_line,0,vtr.moveFromTree,
-                          nextUseNull);
-       }
+        score = -Search( -beta, -alpha, nextDepth, nextCheck, tmp_line,0,vtr.moveFromTree,legalCnt > 3,call_cnt );
      }
-
-   }
+  }
 
 skipSearch:
       UnMakeMove( mv );
 
       if ( is_stop_search ) return 0;
+      
+  
 
-      if ( !cutt_off && score > alpha )
+      if ( !cutt_off && score > alpha)
       {
         best_mv = mv;
         alpha = score;
@@ -415,6 +329,7 @@ skipSearch:
           pv_killer[ply] = mv;
         }
 
+		/*
         ////////  save node (pv line) in tree //////////////
         if( isTree && (doNull | doReduction )==0 ){
            //save node
@@ -457,7 +372,7 @@ skipSearch:
 
         };
         ////////  end save node (pv line) in tree //////////////
-
+	   */
 
         if(alpha >= beta)
           break;
@@ -466,16 +381,7 @@ skipSearch:
 
     if ( legalCnt == 0 )
     {
-      int *h,incH;  
       if ( !check ) return 0; //STALEMATE
-      //save mate piece position
-      h = &history[g.xside] [PIECE( LastMove() )] [TO( LastMove() )];
-      incH = 5 + rand()&7;
-      if(*h + incH < MAX_HIST) *h += incH;
-      else *h = MAX_HIST;
-
-      h = &mate_history[g.xside][PIECE( LastMove() )][TO( LastMove() )];
-      *h = min(MAX_HIST,*h+1);
       return -INF + ply + 1; //MATE
     }
 
@@ -487,6 +393,322 @@ skipSearch:
 }
 
 
+
+int pawn_rank_7(Move mv,int c)
+{
+
+   if(PIECE(mv)==PAWN)
+   {
+	  if(c==BLACK)
+	  {
+	     if(ROW(TO(mv))==6) return 1;
+	  }else{
+
+		 if(ROW(TO(mv))==1) return 1;
+	  }
+
+   }
+   return 0;
+}
+
+
+
+
+
+int main_search( int alpha, int beta, int depth, int check,
+            Line ret_pv_line, int lazy , int isTree, int useNull)
+{
+  int Quies( int alpha, int beta );
+  int StopSearch( void );
+  int Evaluate( int alpha, int beta );
+  int HashLook( int alpha, int beta, int depth, int * ret_score, Move * ret_mv );
+  void HashInsert( int alpha, int beta, int depth, Move mv );
+  int NextMove( PhaseInfo * p, Move * mv );
+  int Check( void );
+  void SaveHist( Move mv, int alpha, int beta );
+  void SavePvLine( Line dest, Line source, Move mv );
+  Move LastMove( void );
+  int Repetition( void );
+  int LegalCastl( Move mv );
+  void SaveRootScore( int alpha, int beta, Move mv, int depth, Line line );
+  int LearnLook( int depth, int alpha, int beta, int * ret_score );
+  int score;
+  Move mv = 0, best_mv = 0;
+  PhaseInfo vtr;
+  Line tmp_line;
+  int c0 = g.side, c1 = c0 ^ 1;
+  int old_alpha = alpha;
+  int L_MTL = MTL(c0);
+  int mate_threat = 0;
+  int oneReply = 0;
+
+  if(ply > 0)
+  {
+   if(check){
+    int LegalMoveList(void);
+    if ( LegalMoveList() == 0 ) return INF - ply; //CAP. OP. KING
+    else if ( treeCnt[ply + 1] == treeCnt[ply] ) return -INF + ply + 1; // mate
+    else if ( treeCnt[ply + 1] == treeCnt[ply] + 1 ) oneReply = 1;
+   }
+  }
+
+  if( check ){
+    if(depth <= 0) depth = 1;			 
+    
+  }else if( ply > s_depth * 3 )
+    depth = 0;
+
+  PhaseInfoReset( & vtr, & alpha );
+  vtr.isTree = isTree;
+
+  if ( depth <= 0 ) return Quies( alpha, beta );
+  else if ( StopSearch() ) return 0;
+  else if ( ply > MAX_PLY - 4 ) return Evaluate( alpha, beta );
+  else if ( ply > 0 && Repetition() ) return 0;
+  else if ( ply > 4 && !doNull && LearnLook( depth, alpha, beta, & score ) ) return score;
+  else
+  {
+   int legalCnt = 0;
+    int cntGoodMoves;
+    Move last = LastMove();
+    int mateThreat = 0;
+  //  int oneReply = 0;
+    HashLook( alpha, beta, depth, & score, & vtr.hash_mv);
+ 
+
+if(ply > 0)
+{
+ /*
+ if(check){
+    int LegalMoveList(void);
+    if ( LegalMoveList() == 0 ) return INF - ply; //CAP. OP. KING
+    else if ( treeCnt[ply + 1] == treeCnt[ply] ) return -INF + ply + 1; // mate
+    else if ( treeCnt[ply + 1] == treeCnt[ply] + 1 ) oneReply = 1;
+ }else
+	*/
+ {
+
+    if ( Generate() == 0 ) return INF - ply; //CAP. OP. KING
+    else if ( treeCnt[ply + 1] == treeCnt[ply] ) return 0; // ?? not realy
+ }
+
+}else if ( treeCnt[ply + 1] == treeCnt[ply] ) return 0; // ?? not realy
+
+    cntGoodMoves = max((treeCnt[ply + 1] - treeCnt[ply])/3, 3);
+
+    while ( NextMove( & vtr, & mv ) )
+    {
+      int nextCheck = 0, nextDepth = depth - 1, cutt_off = 0;
+      int add = 0, threat = 0;
+
+      if ( ( mv & ( LEFT_CASTL | RIGHT_CASTL ) ) && !LegalCastl( mv ) )
+        continue;
+      MakeMove( mv );
+      if ( SqAttack( g.kingSq[g.xside], g.side ) )
+      { // illegal move
+        UnMakeMove( mv );
+        continue;
+      }
+      legalCnt++;
+
+
+      nextCheck = Check();
+
+	 
+    //  if ( ply > 2 )
+      {
+
+        if ( nextCheck ){
+           add += 1;
+           threat = 1;
+        }
+        if ( PIECE( mv ) == PAWN && ( ROW( TO( mv ) ) == ( c0 == WHITE ? 1 : 6 ) ) )
+        {
+           add += 1;
+           threat = 1;
+        }
+        
+		 
+           
+     
+        if(mate_threat ){
+
+           add += 1;
+           threat = 1;
+        }
+        if(oneReply ){
+					  
+            add += 1;
+        }
+ 
+        if(add > 1) add = 1;
+        nextDepth  = nextDepth + add;
+       }
+
+
+
+//#define DEB1		 
+#ifdef DEB1
+	if(ply==1)
+	{
+	   char s[32];
+	   char *MoveToStr(Move,char*);
+
+	   printf("%d ---> %s\n", depth, MoveToStr(mv,s));
+
+	}
+
+#endif
+	 
+//	if(vtr.moveFromTree || nextDepth <= 0){
+  if(MAIN_PV || nextDepth <= 0){
+	   
+     
+       tmp_line[ply] = 0;
+       score = -main_search( -beta, -alpha, nextDepth, nextCheck, tmp_line,0, vtr.moveFromTree, 0 );
+
+  }else{
+							
+        tmp_line[ply] = 0;
+        score = -Search( -(alpha+1), -alpha, nextDepth, nextCheck, tmp_line,0,vtr.moveFromTree,0,0 );
+	    
+		if(score > alpha && score < beta)
+		{
+           tmp_line[ply] = 0;
+           score = -Search( -beta, -alpha, nextDepth, nextCheck, tmp_line,0,vtr.moveFromTree,0,0 );
+		}
+
+
+
+   //if(Use_Null)
+   //0x001
+   if(1)
+   {
+		//if(!check)
+  		  if(score <= alpha)
+		  //if(score>alpha && score<beta)
+			 
+		  {
+			Line x_line;
+
+		    x_line[ply] = 0;
+			score = -main_search( -beta, -alpha, nextDepth, nextCheck, x_line,0, vtr.moveFromTree, 0 );
+			if(score > alpha && score < beta)
+				memcpy(tmp_line,x_line,sizeof(Line));
+		  
+          }
+   }else if(score > alpha){
+
+		    tmp_line[ply] = 0;
+			score = -main_search( -beta, -alpha, nextDepth, nextCheck, tmp_line,0, vtr.moveFromTree, 0 );
+   }
+    
+
+
+
+  }
+
+skipSearch:
+      UnMakeMove( mv );
+
+      if ( is_stop_search ) return 0;
+
+      if ( !cutt_off && score > alpha )
+      {
+        best_mv = mv;
+        alpha = score;
+        if ( TO( mv ) != TO( last ) ) killer[ply] = mv;
+        SaveHist( mv, alpha, beta );
+        if ( ply == 0 )
+          SaveRootScore( alpha, beta, mv, depth, tmp_line );
+
+
+        if ( alpha < beta )
+        {
+          SavePvLine( ret_pv_line, tmp_line, mv );
+          pv_killer[ply] = mv;
+        }
+
+        ////////  save node (pv line) in tree //////////////
+        if( isTree && (doNull | doReduction )==0 ){
+           //save node
+			/* 
+           PVNode **p = pvFindNodeTree(pv_tree, &g.game_list[g.game_cnt], ply);
+           if( p ){
+
+             PVNode **fn = pvFindMove(p, mv);
+             if( fn ) pvToFront(fn, p);
+             else pvInsertToFront(pv_tree, p,
+                                  pvNewNode(pv_tree,depth,g.side,alpha,nextCheck, mv,g.key));
+           }
+			  */
+           //save line
+
+           if(ply == 0  &&  alpha < beta ){
+              int j;
+              PVNode **p = &pv_tree->root;
+
+
+              for( j = 0; j < 80 &&  ret_pv_line[j]; j++){
+                 PVNode **fn = pvFindMove(p, ret_pv_line[j]);
+                 MakeMove( ret_pv_line[j] );
+                 if( fn ){
+                    PVNode **tmp = pvToFront(fn, p);
+                    if(tmp && *tmp){
+                        (*tmp)->depth = depth - j;
+
+                    }
+                 }else{
+                    pvInsertToFront(pv_tree, p,
+                                    pvNewNode(pv_tree,depth-j,g.side,alpha,Check(), ret_pv_line[j],g.key));
+                 }
+                 p = &(*p)->nextPly;
+              }
+              for( j = j - 1; j >= 0; j-- ){
+                 UnMakeMove( ret_pv_line[j] );
+              }
+           }
+
+        };
+        ////////  end save node (pv line) in tree //////////////
+
+
+        if(alpha >= beta)
+          break;
+      }
+    } //while
+
+    if ( legalCnt == 0 )
+    {
+      if ( !check ) return 0; //STALEMATE
+      return -INF + ply + 1; //MATE
+    }
+
+  }
+  if ( ply > 0 )
+    HashInsert( alpha, beta, depth, best_mv );
+
+  return alpha;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+	 
 
 int Quies( int alpha, int beta )
 {
@@ -531,8 +753,8 @@ int Quies( int alpha, int beta )
         if ( mv & PROMOTE ) s += value[PIECE( mv )];
         sort_val[j] = s;
       }
-
-
+      
+    
       if ( treeCnt[ply + 1] - treeCnt[ply] > 20 &&
            g.mtl[g.side] - g.mtl[g.xside] + maxCapValue < alpha
           )
@@ -540,7 +762,7 @@ int Quies( int alpha, int beta )
         QSort( treeCnt[ply], treeCnt[ply + 1] - 1 );
         sort = 1;
       }
-
+      
 
       for ( j = treeCnt[ply]; j < treeCnt[ply + 1]; j++ )
       {
@@ -563,30 +785,38 @@ int Quies( int alpha, int beta )
 
 
 
+void low_hist( int h[2][8][64] )
+{
+  int j;
+  int *p = (int*) h[g.side];
+
+  for(j = 0; j < 8*64; j++)
+	  ((int*)p)[j] /= 2;
+
+}
+
+void ema_hist( int h[2][8][64],int h1[2][8][64] )
+{
+ int c,p,j;
+ for(c=0;c<=1;c++)
+  for(p=PAWN;p<=KING;p++)
+   for(j=0;j<64;j++)
+    h[c][p][j] = h1[c][p][j]/=2;
+
+}
 
 void SaveHist( Move mv, int alpha, int beta )
 {
-  int incH = 1+rand()&1;
-  int *h = &history[g.side] [PIECE( mv )] [TO( mv )];
+  int incH = 1 + (rand()&1);
   if ( alpha < beta ) incH += 1;
-  if(alpha > VALUE_P*2) incH += 2;
- // if(alpha > VALUE_P*2) incH += 1;
   if ( alpha > INF - 100 ){
-      incH += 5 + rand()&7;
-      //??1
-      //printf("#------>\n");
-      int *h1 = &mate_history[g.side][PIECE( mv )][TO( mv )];
-      if(*h1<MAX_HIST) (*h1)++;
+      incH += 18 + (rand()&7);
+     if(  (hist_mate[g.side][PIECE(mv)][TO(mv)] += incH) > MAX_HIST )
+	  low_hist( hist_mate );
   }
- // if( *h < MIN_HIST ) *h = MIN_HIST;
-  if ( *h + incH < MAX_HIST ) ( *h ) += incH;
-  else{
-    int j,k,n;
-    for(j=0;j<2;j++)for(k=0;k<8;k++)for(n=0;n<64;n++)
-        history[j][k][n] /= 2;
-    *h += incH;
-  }
-  histMaxVal[g.side] = min( histMaxVal[g.side] + incH, MAX_HIST);
+  if(  (hist_to[g.side][PIECE(mv)][TO(mv)] += incH) > MAX_HIST )
+	  low_hist( hist_to );
+  
 }
 
 
@@ -601,7 +831,7 @@ int Repetition( void )
   {
     Move * mv = & g.game_list[ci];
     HashKey * key = & g.key_list[ci];
-    int cnt = 0, rep = 0;
+    int cnt = 0, rep = 0;			  
     while ( mv >= g.game_list )
     {
       if ( cnt > 0 && * key == g.key && ( ++rep == 2 || ci >= g.game_cnt - 1 ) ) return 1;
@@ -647,7 +877,7 @@ int NextMove( PhaseInfo * q, Move * ret_mv )
 
    case 1:{
 
-       if( q->isTree && (doNull | doReduction )==0 ){
+       if( q->isTree && (doNull /*| doReduction*/ )==0 ){
            //save node
          // if( ply < 2 )
          // {
@@ -680,6 +910,9 @@ int NextMove( PhaseInfo * q, Move * ret_mv )
       }
       q->moveFromTree = 0;
       q->phase++;
+
+
+      if(ply==0) return 0;
    }
 
    case 3:{
@@ -756,22 +989,32 @@ int NextMove( PhaseInfo * q, Move * ret_mv )
         int cntHist;
         q->low = q->high;
         q->high = treeCnt[ply + 1];
-
+         
         for ( k = j = q->low; j < q->high; j++ )
         {
           int t;
           Move mv = tree[j];
-          t = history[g.side] [PIECE( mv )] [TO( mv )];
+          
+          //0x002
+         t = hist_to[g.side][PIECE( mv )][TO( mv )] ;
+
+//          t = (hist_to[g.side] [PIECE( mv )] [TO( mv )] 
+  //        << 14);
+			 // - hist_from[g.side] [PIECE( mv )] [FROM( mv )];
+          //t = hist[g.side] [PIECE( mv )] [FROM(mv)] [TO( mv )];
+
           if( t > 0 ){
+			//t -= hist_from[g.side] [PIECE( mv )] [FROM( mv )];
+			//t += hist[g.side] [PIECE( mv )] [FROM(mv)] [TO( mv )];
             if( j != k )
             {
               Move tmp = tree[k];
-              tree[k]  = mv;
+              tree[k]  = mv;	
               tree[j]  = tmp;
             }
             sort_val[k] = t;
-            k++;
-          }
+            k++;  
+          } 
         }
         q->high = k;
         cntHist = q->high - q->low;
@@ -779,20 +1022,20 @@ int NextMove( PhaseInfo * q, Move * ret_mv )
         q->sort = 0;
         q->cutCnt = q->low +  cntHist/2;
         q->cntBestKillers =  q->cutCnt;
-       } //case
+       } //case  
 
     case 6:
       {
         if ( q->low < q->high )
         {
-
-          if( q->low == q->cntBestKillers &&
+   
+          if( q->low == q->cntBestKillers && 
               q->high - q->low > 25){
-
+              
               QSort( q->low, q->high - 1 );
-              q->sort = 1;
-          }
-
+              q->sort = 1;     
+          }      
+             
           if ( q->sort == 0 ) Pick( q->low, q->high - 1 );
           q->cut = q->low >= q->cutCnt;
           * ret_mv = tree[q->low++];
@@ -804,16 +1047,16 @@ int NextMove( PhaseInfo * q, Move * ret_mv )
       q->low = q->high;
       q->high = treeCnt[ply + 1];
       q->cut = 1;
-
+           
     case 7:{
-
+    
         if ( q->low < q->high )
         {
           * ret_mv = tree[q->low++];
           return 1;
         }
-
-        return 0;
+     
+        return 0;      
     } //case 7
 
     }//switch
@@ -899,7 +1142,9 @@ void SaveRootScore( int alpha, int beta, Move mv, int depth, Line line )
       p->line[0] = mv;
       for ( j = 1; j < MAX_PLY - 4 && line[j]; j++ )
         p->line[j] = line[j];
-      PrintSearchStatus( p->depth, p->score, ( int )( curr_time - start_time ), cnt_nodes, p->line );
+      PrintSearchStatus( p->depth, p->score, ( int )( curr_time - start_time ), 
+		  cnt_nodes*1000/max(1,curr_time - start_time),
+		  p->line );
       //   }
 
       return;
@@ -972,13 +1217,13 @@ int SweepCnt(int c){
 
 
 //функция должна оставить при выходе treeCnt[0] = 0 !!!!
-
+int search_move2;
 int SearchMove( Root_Score * ret )
 {
   void HistoryInit( void );
   void TimeReset( void );
   int StopSearch( void );
-  const int MAX_DEPTH = MAX_PLY - 10;
+  const MAX_DEPTH = MAX_PLY - 10;
   int d;
  // Line tmp_line;
   void HashClear( void );
@@ -986,11 +1231,10 @@ int SearchMove( Root_Score * ret )
   Move MoveFromLib( int treeLow, int treeHigh );
   time_t s_time = limit_time;
   int old_score;
+  int tmp,a,b;
 
   //инициализация переменных для поиска
-  __cntFindNodeInLearnTbl = 0;
-  root_white_mtl = g.mtl[WHITE] - g.mtl[BLACK];
-  root_white_st_score = g.st_score[WHITE] - g.st_score[BLACK];//0x002
+
   TimeReset();
   srand( time( 0 ) );
   InitEvaluate();
@@ -1001,6 +1245,8 @@ int SearchMove( Root_Score * ret )
   MakeRootList();
   if ( treeCnt[1] == treeCnt[0] ) goto done;
 
+
+  root_side = g.side;
   do{
      int j;
      if( pv_tree == NULL ) pv_tree = malloc(sizeof(PVTree));
@@ -1027,18 +1273,17 @@ int SearchMove( Root_Score * ret )
   do
   {
     Move mv;
-    int N1, N2;
+    
     //чем дальше от начала игры, тем меньше
     //вероятность использования библиотечного хода
-    N1 = 20;
-    N2 = g.game_cnt;
-    if ( N2 > 12 ) N2 = 12;
+    
+	 
 
 
-    if ( rand() % ( N1 - N2 ) != 1 )
+    if( (rand() % 20) > min(g.game_cnt, 15) )
       if ( ( mv = MoveFromLib( treeCnt[0], treeCnt[1] - 1 ) ) != 0 )
       {
-        memset( ret, 0, sizeof( Root_Score ) );
+        memset( ret, 9, sizeof( Root_Score ) );
         ret->mv = mv;
         return 1;
       }
@@ -1047,45 +1292,79 @@ int SearchMove( Root_Score * ret )
 
   root_mtl[WHITE] = g.mtl[WHITE];
   root_mtl[BLACK] = g.mtl[BLACK];
-  Use_Null = g.cnt[WHITE][PAWN] + g.cnt[BLACK][PAWN] > 0  &&
-             abs(g.mtl[WHITE] + g.mtl[BLACK]) > 2*VALUE_Q;
+  root_side = g.side;
+  Use_Null = (g.mtl[WHITE] - value[KING]) > 14*VALUE_P  &&
+	         (g.mtl[BLACK] - value[KING]) > 14*VALUE_P;
+  //Use_Null = g.cnt[WHITE][QUEEN] && g.cnt[BLACK][QUEEN];
   memset(pv_line,0,sizeof(Line));
   s_time = limit_time;
   if( g.game_cnt < 30*2 )
     limit_time *= 2;
+
+
+  tmp =  Evaluate(-INF,INF);
+
+  search_move2 = 0;
   for ( d = 2; d <= MAX_DEPTH && !StopSearch(); d += 1 )
   {
-    int tmp;
-    void MakeHistCutValue(void);
-
+   
+    //void MakeHistCutValue(void);
+    
 //    if( d == 7 ) continue;
-
-
-    MakeHistCutValue();
+    
+    
+   // MakeHistCutValue();
 #ifdef DEBUG
   printf(" histCutVal: %10d %10d\n", histCutVal[0],histCutVal[1]);
-#endif
+#endif    
+    
+    s_depth = d;					 
 
-    s_depth = d;
-    tmp = Search( -INF, INF, s_depth, Check(), pv_line, 0, 1,0 );
+
+	//a = tmp -  VALUE_P;
+	//b = tmp +  VALUE_P;
+    
+	a = -INF;
+	b = INF;
+	
+
+
+    tmp = main_search( a, b, s_depth, Check(), pv_line, 0, 1,0 );
+
+	if(!StopSearch())
+	{
+	  if(tmp <= a)
+         tmp = main_search( -INF, b, s_depth, Check(), pv_line, 0, 1,0 );
+	  else if(tmp >= b)
+		tmp = main_search( a, INF, s_depth, Check(), pv_line, 0, 1,0 );
+	}
+
+
+
+
     if ( tmp > INF - 100 ) break;
     if( tmp < -INF + 100 && s_depth > 6 ) break;
-    if ( ( curr_time - start_time ) * 2 > limit_time ) break;
-
-    if( s_depth > 2  &&
-       abs(old_score - tmp) < 80  &&
-       (curr_time - start_time) * 2 > s_time ) break;
+    if ( ( curr_time - start_time ) * 1.2 > limit_time ) break;
+    
+    if( s_depth > 2  &&				   
+       abs(old_score - tmp) < 80  && 
+       (curr_time - start_time) * 1.5 > s_time ) break;
     old_score = tmp;
   }
   limit_time = s_time;
 
 done:
-
+//0x002
   if ( treeCnt[1] == treeCnt[0] ) return 0;
   //RootPick( 0, treeCnt[1] - 1 );
   // * ret = root_list[0];
   memset( ret, 9, sizeof( Root_Score ) );
   ret->mv  = pv_tree->root->mv;
+  //0x002
+  if(ret->mv != search_move2)
+  {
+    ret->mv = search_move2; //под хбоард ведел что не последний ход вылезает
+  }
   /*
   do
   {
@@ -1107,7 +1386,7 @@ done:
   while ( 0 );
 
   ///?????
-  /*
+#ifdef DEB1
   do{
     FILE *f = fopen("test", "w");
     if(f){
@@ -1117,98 +1396,23 @@ done:
       fclose(f);
     }
   }while(0);
-    */
+#endif
+    
   /////?????
-  //??
-  //printf("#__cntFindNodeInLearnTbl=%d\n",__cntFindNodeInLearnTbl);
+
   return 1;
 }
 
 
 
-void MakeHistCutValue(void){
-  int c,sq,p;
-  int tmp[2][8][64];
-  U64 nodes[2] = {0,0};
-
-  for(c = WHITE; c <= BLACK; c++)
-   for(p = PAWN; p <= KING; p++)
-    for(sq = 0; sq < 64; sq++)
-    {
-      nodes[c] += history[c][p][sq];
-      tmp[c][p][sq] = history[c][p][sq];
-    }
-
-  for(c = WHITE; c <= BLACK; c++)
-  {
-    U64 cnt = 0;
-    histCutVal[c] = 0;
-    while( cnt < nodes[c]/2 )
-    {
-     int minVal = INT_MAX-1, *ptr = 0;
-     for(p = PAWN; p <= KING; p++)
-       for(sq = 0; sq < 64; sq++)
-       {
-         if( tmp[c][p][sq] > 0 && tmp[c][p][sq] < minVal )
-         {
-           minVal = tmp[c][p][sq];
-           ptr = &tmp[c][p][sq];
-         }
-       }
-      if( ptr == 0 ) break;
-      cnt += (*ptr);
-      histCutVal[c] = max( histCutVal[c], *ptr );
-      *ptr = 0;
-    }//while
-  }
-}
-
-void HistoryClear(void){
-   histMaxVal[WHITE] = histMaxVal[BLACK] = 0;
-   histCutVal[WHITE] = histCutVal[BLACK] = 0;
-   memset(history,0,sizeof(history));
-   memset(mate_history,0,sizeof(history));   
-}
+ 
 void HistoryInit( void )
 {
-    
-  //if(g.game_cnt%40<3){
-  //   HistoryClear();
-  //   exit;
-  //}
-  histMaxVal[WHITE] = histMaxVal[BLACK] = 0;
-  histCutVal[WHITE] = histCutVal[BLACK] = 0;
-  do
-  {
-    int c, p, sq;
-    for ( c = WHITE; c <= BLACK; c++ )
-      for ( p = PAWN; p <= KING; p++ )
-        for ( sq = 0; sq < 64; sq++ )
-        { 
-          int mh=mate_history[c][p][sq];
-          history[c][p][sq]=mh>0?rand()%(mh/2+1):0;
-        }
-  }while(0);
-   /*
-  //RESET HISTORY
-  do
-  {
-    int c, p, sq;
-    for ( c = WHITE; c <= BLACK; c++ )
-      for ( p = PAWN; p <= KING; p++ )
-        for ( sq = 0; sq < 64; sq++ )
-        {
-
-          int score = score_table[c] [p] [sq], * h = & history[c] [p] [sq];
-
-          if ( score < 0 ) * h = -( rand() % ( -score ) );
-          else if ( score > 0 ) * h = rand() % score;
-          else
-            * h = 0;
-
-
-        }
-  }
-  while ( 0 );
- */
+   
+ //  low_hist(hist_mate);
+ //  memcpy(hist_to,hist_mate,sizeof(hist_to));
+   ema_hist(hist_to,hist_mate);
 }
+
+
+
